@@ -3199,7 +3199,7 @@ var SPEC_ICONS = {
   "Shaman":{"Elemental":"spell_nature_lightning","Enhancement":"spell_nature_lightningshield","Restoration":"spell_nature_magicimmunity"},
   "Mage":{"Arcane":"spell_holy_magicalsentry","Fire":"spell_fire_firebolt02","Frost":"spell_frost_frostbolt02"},
   "Warlock":{"Affliction":"spell_shadow_deathcoil","Demonology":"spell_shadow_metamorphosis","Destruction":"spell_shadow_rainoffire"},
-  "Druid":{"Balance":"spell_nature_starfall","Feral":"ability_racial_bearform","Restoration":"spell_nature_healingtouch"}
+  "Druid":{"Balance":"spell_nature_starfall","Feral Cat":"ability_druid_catform","Feral Bear":"ability_racial_bearform","Restoration":"spell_nature_healingtouch"}
 };
 
 var ALL_SPECS_MAP = {
@@ -3211,7 +3211,7 @@ var ALL_SPECS_MAP = {
   "Shaman":["Elemental","Enhancement","Restoration"],
   "Mage":["Arcane","Fire","Frost"],
   "Warlock":["Affliction","Demonology","Destruction"],
-  "Druid":["Balance","Feral","Restoration"]
+  "Druid":["Balance","Feral Cat","Feral Bear","Restoration"]
 };
 
 function toggleClassNode(el) {
@@ -3314,7 +3314,8 @@ function showSpecPicker() {
 function showMainUI() {
   var spec = SPECS[currentSpec];
   if (!spec) return;
-  var classColor = spec.class.toLowerCase() === "mage" ? "var(--mage-color)" : "var(--paladin-color)";
+  var classColorMap = {"Mage":"var(--mage-color)","Paladin":"var(--paladin-color)","Warrior":"var(--warrior-color)","Rogue":"var(--rogue-color)","Hunter":"var(--hunter-color)","Warlock":"var(--warlock-color)","Priest":"var(--priest-color)","Shaman":"var(--shaman-color)","Druid":"var(--druid-color)"};
+  var classColor = classColorMap[spec.class] || spec.classColor;
   var hSpec = document.getElementById("headerSpec");
   hSpec.innerHTML = '<span class="spec-name" style="color:' + classColor + '">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</span>' +
     '<button class="change-spec-btn" onclick="showSpecPicker()">Change Spec</button>';
@@ -3584,7 +3585,8 @@ function renderStatComparison(bisStats, myStats) {
 function renderSheet() {
   var spec = specData();
   var bis = spec.slots;
-  var classColor = spec.class.toLowerCase() === "mage" ? "var(--mage-color)" : "var(--paladin-color)";
+  var classColorMap = {"Mage":"var(--mage-color)","Paladin":"var(--paladin-color)","Warrior":"var(--warrior-color)","Rogue":"var(--rogue-color)","Hunter":"var(--hunter-color)","Warlock":"var(--warlock-color)","Priest":"var(--priest-color)","Shaman":"var(--shaman-color)","Druid":"var(--druid-color)"};
+  var classColor = classColorMap[spec.class] || spec.classColor;
 
   // Toggle switch
   var toggleHtml = '<div class="sheet-toggle">';
