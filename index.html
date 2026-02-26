@@ -4131,7 +4131,7 @@ function renderStatSummary(stats) {
 
   var relevant = [], minor = [];
   for (var i = 0; i < allKeys.length; i++) {
-    if (relevantKeys[allKeys[i]]) relevant.push(allKeys[i]);
+    if (stats[allKeys[i]] >= 15) relevant.push(allKeys[i]);
     else minor.push(allKeys[i]);
   }
   relevant.sort(function(a, b) {
@@ -4205,7 +4205,8 @@ function renderStatSummaryVsBis(myStats, bisStats) {
   var relevant = [], minor = [];
   var statKeys = Object.keys(allKeys);
   for (var i = 0; i < statKeys.length; i++) {
-    if (relevantKeys[statKeys[i]]) relevant.push(statKeys[i]);
+    var maxOfBoth = Math.max(myStats[statKeys[i]] || 0, bisStats[statKeys[i]] || 0);
+    if (maxOfBoth >= 15) relevant.push(statKeys[i]);
     else minor.push(statKeys[i]);
   }
   relevant.sort(function(a, b) {
