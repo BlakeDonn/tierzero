@@ -4180,7 +4180,7 @@ function renderStatSummary(stats) {
       '<div class="stat-name">' + niceName + '</div>' +
       '<div class="stat-bar-wrap"><div class="stat-bar"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div></div>' +
       '<div class="stat-val">' + val + (isCap ? '<span class="cap-label' + (val >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + '</div>' +
-      (ratingToPct(key, val) ? '<div class="stat-pct">' + ratingToPct(key, val) + '</div>' : '') +
+      '<div class="stat-pct">' + (ratingToPct(key, val) || '') + '</div>' +
     '</div>';
   }
 
@@ -4257,7 +4257,7 @@ function renderStatSummaryVsBis(myStats, bisStats) {
       '<div class="stat-name">' + niceName + '</div>' +
       '<div class="stat-bar-wrap"><div class="stat-bar"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div></div>' +
       '<div class="stat-val">' + mv + (isCap ? '<span class="cap-label' + (mv >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + '</div>' +
-      (ratingToPct(key, mv) ? '<div class="stat-pct">' + ratingToPct(key, mv) + '</div>' : '') +
+      '<div class="stat-pct">' + (ratingToPct(key, mv) || '') + '</div>' +
       (bv > 0 ? '<div class="stat-diff ' + cls + '">' + diffStr + '</div>' : '<div class="stat-diff"></div>') +
     '</div>';
   }
