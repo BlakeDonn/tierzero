@@ -610,8 +610,8 @@
 
 // Size toggle — apply saved preference immediately to avoid flash
 (function() {
-  var saved = localStorage.getItem('prebis-ui-size') || 'small';
-  if (saved !== 'small') document.documentElement.classList.add('size-' + saved);
+  var saved = localStorage.getItem('prebis-ui-size') || 'large';
+  document.documentElement.classList.add('size-' + saved);
   document.addEventListener('DOMContentLoaded', function() {
     var toggle = document.getElementById('sizeToggle');
     if (!toggle) return;
