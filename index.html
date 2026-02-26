@@ -224,21 +224,22 @@
     .spec-notes { font-size:0.78rem; color:var(--text-dim); text-align:left; margin-bottom:10px; line-height:1.6; }
 
     /* Stat rows */
-    .stat-summary { display:flex; flex-direction:column; gap:0; text-align:left; width:fit-content; margin:0 auto; }
+    .stat-summary { display:flex; flex-direction:column; gap:0; text-align:left; }
     .stat-row {
-      display:flex; align-items:center; gap:0;
+      display:flex; align-items:center; justify-content:center; gap:0;
       padding:5px 0;
     }
+    .stat-summary.two-col .stat-row { justify-content:flex-start; }
     .stat-row .stat-name {
       font-size:0.62rem; color:var(--text-dim);
-      width:78px; flex-shrink:0; text-transform:uppercase; letter-spacing:0.3px;
+      width:90px; flex-shrink:0; text-transform:uppercase; letter-spacing:0.3px;
     }
     .stat-row .stat-bar-wrap { display:none; }
     .stat-row .stat-val {
       font-size:0.65rem; font-weight:500;
       color:var(--text-gold);
-      width:38px; text-align:right; flex-shrink:0;
-      padding-left:6px;
+      width:55px; text-align:right; flex-shrink:0;
+      white-space:nowrap;
     }
     .stat-row .stat-diff {
       font-size:0.55rem; width:30px; text-align:right; flex-shrink:0;
@@ -248,10 +249,10 @@
     .stat-diff.under { color:#cd5c5c; }
     .stat-diff.exact { color:var(--text-dim); opacity:0.4; }
 
-    /* Rating-to-percent display */
-    .stat-pct {
-      font-size:0.55rem; color:var(--text-dim); opacity:0.85;
-      width:40px; text-align:left; flex-shrink:0; padding-left:10px;
+    /* Rating-to-percent inline after value */
+    .stat-pct-inline {
+      font-size:0.5rem; color:var(--text-dim); opacity:0.85;
+      margin-left:4px; font-weight:400;
     }
 
     /* Cap stats — show cap inline after value like "142/164" */
@@ -272,7 +273,6 @@
     /* Two-col for specs with many stats */
     .stat-summary.two-col { display:grid; grid-template-columns:auto auto; gap:0 30px; justify-content:center; }
     .stat-summary.two-col .stat-row .stat-name { width:68px; font-size:0.62rem; }
-    .stat-summary.two-col .stat-row .stat-val { width:32px; font-size:0.65rem; }
     .stat-summary.two-col .stat-row .stat-diff { width:28px; font-size:0.55rem; }
 
     /* Compared-to-bis subtitle */
@@ -4176,11 +4176,11 @@ function renderStatSummary(stats) {
 
     var isCap = (key === 'hit' && spec.hitCap) || (key === 'def' && spec.defCap);
     var capVal = key === 'hit' ? spec.hitCap : spec.defCap;
+    var pctStr = ratingToPct(key, val);
     html += '<div class="stat-row" title="' + tip.replace(/"/g,'&quot;') + '">' +
       '<div class="stat-name">' + niceName + '</div>' +
       '<div class="stat-bar-wrap"><div class="stat-bar"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div></div>' +
-      '<div class="stat-val">' + val + (isCap ? '<span class="cap-label' + (val >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + '</div>' +
-      '<div class="stat-pct">' + (ratingToPct(key, val) || '') + '</div>' +
+      '<div class="stat-val">' + val + (isCap ? '<span class="cap-label' + (val >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + (pctStr ? '<span class="stat-pct-inline">' + pctStr + '</span>' : '') + '</div>' +
     '</div>';
   }
 
@@ -4253,11 +4253,11 @@ function renderStatSummaryVsBis(myStats, bisStats) {
 
     var isCap = (key === 'hit' && spec.hitCap) || (key === 'def' && spec.defCap);
     var capVal = key === 'hit' ? spec.hitCap : spec.defCap;
+    var pctStr = ratingToPct(key, mv);
     html += '<div class="stat-row" title="' + tip.replace(/"/g,'&quot;') + '">' +
       '<div class="stat-name">' + niceName + '</div>' +
       '<div class="stat-bar-wrap"><div class="stat-bar"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div></div>' +
-      '<div class="stat-val">' + mv + (isCap ? '<span class="cap-label' + (mv >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + '</div>' +
-      '<div class="stat-pct">' + (ratingToPct(key, mv) || '') + '</div>' +
+      '<div class="stat-val">' + mv + (isCap ? '<span class="cap-label' + (mv >= capVal ? ' capped' : '') + '">/' + capVal + '</span>' : '') + (pctStr ? '<span class="stat-pct-inline">' + pctStr + '</span>' : '') + '</div>' +
       (bv > 0 ? '<div class="stat-diff ' + cls + '">' + diffStr + '</div>' : '<div class="stat-diff"></div>') +
     '</div>';
   }
