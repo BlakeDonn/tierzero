@@ -1,0 +1,2640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tier Zero — TBC Pre-Raid Gear Planner</title>
+
+  <!-- Wowhead Tooltips -->
+  <script>const whTooltips = {colorLinks: true, iconizeLinks: true, renameLinks: false};</script>
+  <script src="https://wow.zamimg.com/js/tooltips.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0a0a1a;
+      --bg-panel: #12122a;
+      --bg-slot: #1a1a3a;
+      --bg-slot-hover: #222244;
+      --border-gold: #c8aa6e;
+      --border-dim: #2a2a3e;
+      --text-gold: #f0e6d2;
+      --text-dim: #a09b8c;
+      --epic: #a335ee;
+      --rare: #0070dd;
+      --uncommon: #1eff00;
+      --legendary: #ff8000;
+      --mage-color: #69ccf0;
+      --paladin-color: #f58cba;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Roboto',sans-serif; background:var(--bg-dark); color:var(--text-gold); min-height:100vh; line-height:1.5; }
+
+    /* Header */
+    .header { padding:8px 16px; border-bottom:2px solid var(--border-gold); background:linear-gradient(180deg,rgba(200,170,110,0.08) 0%,transparent 100%); }
+    .header-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; max-width:1200px; margin:0 auto; }
+    .header h1 { font-family:'Cinzel',serif; font-size:1.3rem; color:var(--border-gold); text-shadow:0 0 20px rgba(200,170,110,0.3); letter-spacing:1px; text-align:center; }
+    .header .header-spec { display:inline-flex; align-items:center; gap:10px; font-size:0.85rem; justify-self:end; }
+    .header .header-spec .spec-name { font-family:'Cinzel',serif; font-weight:600; }
+    .header .header-spec .change-spec-btn { font-size:0.7rem; color:var(--text-dim); background:none; border:1px solid var(--border-dim); border-radius:12px; padding:2px 10px; cursor:pointer; transition:all 0.2s; }
+    .header .header-spec .change-spec-btn:hover { color:var(--text-gold); border-color:var(--border-gold); }
+
+    /* Spec Tabs (hidden when spec chosen) */
+    .nav-bar { display:flex; justify-content:center; gap:2px; padding:8px 16px; background:var(--bg-panel); border-bottom:1px solid var(--border-dim); flex-wrap:wrap; }
+    .nav-bar.hidden { display:none; }
+    .spec-tab { font-size:0.82rem; font-weight:500; padding:8px 16px; background:transparent; color:var(--text-dim); border:none; border-bottom:3px solid transparent; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+    .spec-tab:hover { color:var(--text-gold); background:rgba(200,170,110,0.05); }
+    .spec-tab.active { color:var(--text-gold); border-bottom-color:var(--border-gold); }
+    .spec-tab.active[data-class="mage"] { border-bottom-color:var(--mage-color); color:var(--mage-color); }
+    .spec-tab.active[data-class="paladin"] { border-bottom-color:var(--paladin-color); color:var(--paladin-color); }
+
+    /* Spec Picker (initial screen) */
+    .spec-picker-overlay { position:fixed; inset:0; z-index:500; background:var(--bg-dark); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
+    .spec-picker-overlay h2 { font-family:'Cinzel',serif; font-size:1.6rem; color:var(--border-gold); text-shadow:0 0 20px rgba(200,170,110,0.3); }
+    .spec-picker-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; max-width:700px; width:100%; padding:0 20px; }
+    .spec-pick-card { background:var(--bg-panel); border:2px solid var(--border-dim); border-radius:10px; padding:20px 16px; text-align:center; cursor:pointer; transition:all 0.2s; }
+    .spec-pick-card:hover { border-color:var(--border-gold); background:var(--bg-slot-hover); transform:translateY(-2px); }
+    .spec-pick-card .pick-icon { font-size:2rem; margin-bottom:6px; }
+    .spec-pick-card .pick-name { font-family:'Cinzel',serif; font-size:1rem; color:var(--text-gold); }
+    .spec-pick-card .pick-class { font-size:0.75rem; color:var(--text-dim); margin-top:2px; }
+    .spec-pick-card[data-class="mage"]:hover { border-color:var(--mage-color); }
+    .spec-pick-card[data-class="paladin"]:hover { border-color:var(--paladin-color); }
+
+
+    /* View Tabs */
+    .view-tabs { display:flex; gap:0; }
+    .view-btn { font-size:0.8rem; font-weight:500; padding:6px 16px; background:transparent; color:var(--text-dim); border:none; border-bottom:2px solid transparent; cursor:pointer; transition:all 0.2s; }
+    .view-btn:hover { color:var(--text-gold); }
+    .view-btn.active { color:var(--text-gold); border-bottom-color:var(--border-gold); }
+
+    /* Views */
+    .view { display:none; padding:20px 16px; max-width:1200px; margin:0 auto; }
+    .view.active { display:block; }
+
+    /* ===== CHARACTER SHEET ===== */
+    .paperdoll-container { display:grid; grid-template-columns:1fr minmax(300px,500px) 1fr; gap:4px 14px; align-items:start; }
+    .slot-column .slot-header { padding:5px 8px; gap:6px; }
+    .slot-column .slot-label { font-size:0.6rem; }
+    .slot-column .slot-bis .item-link { font-size:0.78rem; }
+    .slot-column .slot-bis .item-src { font-size:0.64rem; }
+    .slot-column .slot-expand { font-size:0.65rem; }
+    .slot-column { display:flex; flex-direction:column; gap:3px; }
+    .center-column { display:flex; flex-direction:column; gap:6px; align-items:center; min-width:0; }
+    .weapon-mid { display:flex; justify-content:center; gap:8px; width:100%; margin-top:16px; }
+    .weapon-mid .gear-slot, .weapon-bottom .gear-slot { flex:1; min-width:0; transition:flex 0.25s ease; }
+    .weapon-mid .gear-slot.open, .weapon-bottom .gear-slot.open { flex:3; }
+    .weapon-mid .slot-header, .weapon-bottom .slot-header { padding:6px 8px; gap:6px; flex-direction:column; align-items:center; text-align:center; }
+    .weapon-mid .slot-bis, .weapon-bottom .slot-bis { text-align:center; width:100%; min-width:0; }
+    .weapon-mid .slot-bis .item-link, .weapon-bottom .slot-bis .item-link { font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .weapon-mid .slot-label, .weapon-bottom .slot-label { font-size:0.58rem; white-space:nowrap; }
+    .weapon-mid .slot-bis .item-src, .weapon-bottom .slot-bis .item-src { font-size:0.62rem; }
+    .weapon-mid .slot-expand, .weapon-bottom .slot-expand { font-size:0.6rem; }
+    .weapon-bottom { display:flex; justify-content:center; gap:8px; margin-top:6px; }
+    .weapon-bottom .gear-slot { max-width:220px; }
+
+    /* Gear slot card */
+    .gear-slot { background:var(--bg-slot); border:1px solid var(--border-dim); border-radius:6px; border-left:3px solid var(--border-dim); transition:all 0.15s; cursor:pointer; overflow:hidden; }
+    .gear-slot:hover { border-color:rgba(200,170,110,0.4); background:var(--bg-slot-hover); }
+    .gear-slot.quality-epic { border-left-color:var(--epic); }
+    .gear-slot.quality-rare { border-left-color:var(--rare); }
+    .gear-slot.quality-uncommon { border-left-color:var(--uncommon); }
+    .gear-slot.quality-legendary { border-left-color:var(--legendary); }
+
+    .slot-header { display:flex; align-items:center; gap:10px; padding:8px 10px; }
+    .slot-label { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); }
+    .slot-bis { flex:1; min-width:0; }
+    .slot-bis .item-link { font-size:0.82rem; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .slot-bis .item-src { font-size:0.68rem; color:var(--text-dim); margin-top:1px; }
+    .slot-expand { font-size:0.7rem; color:var(--text-dim); flex-shrink:0; transition:transform 0.2s; }
+    .gear-slot.open .slot-expand { transform:rotate(180deg); }
+
+    /* Alternatives dropdown */
+    .slot-alts { display:none; border-top:1px solid var(--border-dim); background:rgba(0,0,0,0.2); }
+    .gear-slot.open .slot-alts { display:block; }
+    .alt-item { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 16px; border-bottom:1px solid rgba(42,42,62,0.5); font-size:0.8rem; transition:background 0.1s; }
+    .alt-item:last-child { border-bottom:none; }
+    .alt-item:hover { background:rgba(200,170,110,0.04); }
+    .alt-rank { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:700; flex-shrink:0; border:1px solid #444; background:rgba(255,255,255,0.04); color:var(--text-dim); }
+    .alt-rank.r1 { background:rgba(200,170,110,0.25); color:var(--border-gold); border-color:var(--border-gold); }
+    .alt-rank.r2 { background:rgba(192,192,192,0.12); color:#bbb; border-color:#777; }
+    .alt-rank.r3 { background:rgba(180,115,50,0.12); color:#b87333; border-color:#906030; }
+    .alt-info { flex:1; min-width:0; }
+    .alt-info .alt-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .alt-info .alt-src { font-size:0.68rem; color:var(--text-dim); }
+
+    /* Center panel */
+    .character-model { background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:8px; padding:12px; text-align:center; min-width:0; }
+    .character-model.compact { padding:8px; }
+    .stats-row { display:flex; gap:8px; width:100%; align-items:stretch; }
+    .stats-row > * { flex:1; min-width:0; }
+    .character-model.compact .spec-notes { margin-bottom:6px; font-size:0.72rem; line-height:1.4; }
+    .character-model.compact .stat-summary { gap:5px; }
+    .character-model.compact .stat-row .stat-label { font-size:0.7rem; }
+    .character-model.compact .stat-bar { height:4px; }
+    .spec-title { font-family:'Cinzel',serif; font-size:1rem; font-weight:600; margin-bottom:12px; }
+    .spec-notes { font-size:0.78rem; color:var(--text-dim); text-align:left; margin-bottom:12px; line-height:1.6; }
+    .stat-summary { display:flex; flex-direction:column; gap:8px; }
+    .stat-row { display:flex; flex-direction:column; gap:2px; }
+    .stat-row .stat-label { display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); }
+    .stat-row .stat-value { color:var(--text-gold); font-weight:500; }
+    .stat-bar { width:100%; height:5px; background:var(--bg-dark); border-radius:3px; overflow:hidden; }
+    .stat-bar .stat-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--border-gold),#e8d5a3); transition:width 0.4s; }
+    .stat-bar .stat-fill.cap-hit { background:linear-gradient(90deg,#4a9,#6d6); }
+    .stat-bar .stat-fill.cap-full { background:linear-gradient(90deg,#4a9,#2f2); }
+
+    /* ===== GEARING ROUTES ===== */
+    .routes-container { display:flex; flex-direction:column; gap:20px; }
+    .routes-two-col { display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+    .routes-section-title { font-family:'Cinzel',serif; font-size:1.1rem; color:var(--border-gold); border-bottom:1px solid var(--border-dim); padding-bottom:6px; margin-bottom:10px; }
+    .priority-list { list-style:none; counter-reset:priority; display:flex; flex-direction:column; gap:6px; }
+    .priority-list li { counter-increment:priority; display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--bg-slot); border:1px solid var(--border-dim); border-radius:6px; font-size:0.88rem; }
+    .priority-list li::before { content:counter(priority); display:flex; align-items:center; justify-content:center; width:26px; height:26px; background:var(--bg-dark); border:1px solid var(--border-gold); border-radius:50%; font-family:'Cinzel',serif; font-size:0.75rem; font-weight:700; color:var(--border-gold); flex-shrink:0; }
+    .routes-search { width:100%; padding:7px 12px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:6px; font-family:'Roboto',sans-serif; font-size:0.82rem; outline:none; margin-bottom:10px; }
+    .routes-search:focus { border-color:var(--border-gold); }
+    .routes-search::placeholder { color:var(--text-dim); }
+    .priority-sidebar { position:sticky; top:12px; }
+
+    /* ===== GEAR TRACKER ===== */
+    .tracker-container { display:flex; flex-direction:column; gap:14px; }
+    .tracker-progress { background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:8px; padding:18px; text-align:center; }
+    .progress-label { font-family:'Cinzel',serif; font-size:1rem; color:var(--border-gold); margin-bottom:8px; }
+    .progress-bar { width:100%; height:10px; background:var(--bg-dark); border-radius:5px; overflow:hidden; border:1px solid var(--border-dim); }
+    .progress-fill { height:100%; border-radius:5px; background:linear-gradient(90deg,var(--uncommon),#2aff2a); transition:width 0.4s; }
+    .progress-text { font-size:0.82rem; color:var(--text-dim); margin-top:6px; }
+    .tracker-stats { display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; padding:6px 0; font-size:0.8rem; color:var(--text-dim); }
+    .tracker-stats strong { color:var(--text-gold); }
+    .tracker-slots { display:flex; flex-direction:column; gap:6px; }
+    .tracker-slot { display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--bg-slot); border:1px solid var(--border-dim); border-radius:6px; }
+    .tracker-slot-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); width:85px; flex-shrink:0; }
+    .tracker-slot select { flex:1; padding:5px 8px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:4px; font-family:'Roboto',sans-serif; font-size:0.82rem; cursor:pointer; outline:none; }
+    .tracker-slot select:focus { border-color:var(--border-gold); }
+    .owned-badge, .needed-badge { font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:10px; flex-shrink:0; }
+    .owned-badge { background:rgba(30,255,0,0.12); color:var(--uncommon); border:1px solid rgba(30,255,0,0.25); }
+    .needed-badge { background:rgba(255,60,60,0.1); color:#ff5555; border:1px solid rgba(255,60,60,0.2); }
+    .tracker-actions { display:flex; justify-content:center; padding:12px 0; }
+    .tracker-actions button { font-size:0.82rem; padding:8px 20px; border-radius:6px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-panel); color:var(--text-gold); }
+    .tracker-actions button:hover { border-color:var(--border-gold); }
+    .reset-btn { color:#ff5555!important; border-color:rgba(255,60,60,0.25)!important; }
+    .reset-btn:hover { background:rgba(255,60,60,0.08)!important; border-color:#ff5555!important; }
+
+    /* Wowhead links - let their script handle colors/icons */
+    a[href*="wowhead.com"] { text-decoration:none; }
+    .wowhead-tooltip { transform:scale(0.75); transform-origin:top left; }
+
+    /* Source tags */
+    .tag { display:inline-block; font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; padding:1px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+    .tag-heroic { background:rgba(163,53,238,0.15); color:#b366e0; }
+    .tag-dungeon { background:rgba(0,112,221,0.15); color:#5eaadd; }
+    .tag-craft { background:rgba(255,128,0,0.15); color:#ffaa44; }
+    .tag-rep { background:rgba(30,255,0,0.12); color:#44cc44; }
+    .tag-pvp { background:rgba(255,60,60,0.15); color:#dd5555; }
+    .tag-badge { background:rgba(200,170,110,0.15); color:var(--border-gold); }
+    .tag-quest { background:rgba(255,255,0,0.1); color:#cccc44; }
+    .tag-world { background:rgba(163,53,238,0.1); color:#9966cc; }
+    .tag-classic { background:rgba(139,90,43,0.15); color:#c4a46c; }
+
+    /* ===== GEARING ROUTES — Visual Overhaul ===== */
+    .source-list-detail { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+    .source-list-col { display:flex; flex-direction:column; gap:2px; }
+
+    /* Category headers */
+    .source-category { margin-bottom:2px; }
+    .source-cat-header { display:flex; align-items:center; gap:8px; padding:6px 10px; cursor:pointer; user-select:none; border-radius:6px; transition:background 0.12s; }
+    .source-cat-header:hover { background:rgba(200,170,110,0.05); }
+    .source-cat-header .cat-icon { font-size:0.9rem; }
+    .source-cat-header .cat-label { font-family:'Cinzel',serif; font-size:0.8rem; color:var(--text-gold); flex:1; }
+    .source-cat-header .cat-count { font-size:0.6rem; color:var(--text-dim); }
+    .source-cat-header .cat-count strong { color:var(--uncommon); }
+    .source-cat-header .cat-arrow { font-size:0.55rem; color:var(--text-dim); transition:transform 0.15s; }
+    .source-category.cat-open .cat-arrow { transform:rotate(180deg); }
+    .source-cat-children { display:none; padding-left:12px; }
+    .source-category.cat-open .source-cat-children { display:flex; flex-direction:column; gap:2px; }
+
+    /* Color bar on category header */
+    .source-cat-header .cat-bar { width:40px; height:3px; border-radius:2px; flex-shrink:0; overflow:hidden; background:rgba(255,255,255,0.06); }
+    .source-cat-header .cat-bar-fill { height:100%; border-radius:2px; }
+
+    /* Individual source rows */
+    .source-row { display:flex; align-items:center; gap:6px; padding:5px 8px; background:var(--bg-slot); border:1px solid transparent; border-radius:4px; cursor:pointer; transition:all 0.12s; position:relative; overflow:hidden; font-size:0.75rem; }
+    .source-row:hover { border-color:rgba(200,170,110,0.3); background:var(--bg-slot-hover); }
+    .source-row.source-active { border-color:var(--border-gold); background:var(--bg-slot-hover); }
+    .source-row.source-complete { opacity:0.4; }
+    .source-row .source-name { flex:1; color:var(--text-gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .source-row.source-complete .source-name { text-decoration:line-through; }
+    .source-row .source-count { font-size:0.6rem; color:var(--text-dim); flex-shrink:0; }
+    .source-row .source-count strong { color:var(--uncommon); }
+
+    /* Category type colors */
+    .source-category.cat-heroic .cat-bar-fill { background:#8844cc; }
+    .source-category.cat-badge .cat-bar-fill { background:var(--border-gold); }
+    .source-category.cat-craft .cat-bar-fill { background:#cc7722; }
+    .source-category.cat-rep .cat-bar-fill { background:#33aa33; }
+    .source-category.cat-classic .cat-bar-fill { background:#8b6633; }
+    .source-category.cat-dungeon .cat-bar-fill { background:#2266bb; }
+    .source-category.cat-quest .cat-bar-fill { background:#aaaa33; }
+    .source-category.cat-pvp .cat-bar-fill { background:#cc3333; }
+    .source-category.cat-world .cat-bar-fill { background:#7744aa; }
+    .source-category.cat-_other .cat-bar-fill { background:#8899aa; }
+
+    /* Detail panel (right side, sticky) */
+    .detail-panel { position:sticky; top:12px; background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:8px; overflow:hidden; min-height:120px; }
+    .detail-panel-header { padding:12px 14px; border-bottom:1px solid var(--border-dim); }
+    .detail-panel-header .detail-title { font-family:'Cinzel',serif; font-size:0.95rem; color:var(--text-gold); display:flex; align-items:center; gap:8px; }
+    .detail-panel-header .detail-count { font-size:0.72rem; color:var(--text-dim); margin-top:4px; }
+    .detail-panel-header .detail-count strong { color:var(--uncommon); }
+    .detail-panel-header .detail-bar { height:3px; background:var(--bg-dark); border-radius:2px; margin-top:6px; overflow:hidden; }
+    .detail-panel-header .detail-bar-fill { height:100%; border-radius:2px; }
+    .detail-panel-body { padding:8px 10px; }
+    .detail-panel-body .item-list { list-style:none; display:flex; flex-direction:column; gap:2px; }
+    .detail-panel-body .item-list li { display:flex; align-items:center; gap:8px; font-size:0.8rem; padding:5px 6px; border-radius:4px; transition:background 0.1s; }
+    .detail-panel-body .item-list li:hover { background:rgba(200,170,110,0.04); }
+    .detail-panel-body .item-list li .slot-tag { font-size:0.6rem; text-transform:uppercase; color:var(--text-dim); min-width:55px; flex-shrink:0; }
+    .detail-panel-body .item-list li .owned-indicator { margin-left:auto; font-size:0.6rem; font-weight:700; padding:1px 5px; border-radius:8px; flex-shrink:0; }
+    .detail-panel-body .item-list li .owned-indicator.is-owned { background:rgba(30,255,0,0.12); color:var(--uncommon); }
+    .detail-panel-body .item-list li .owned-indicator.is-needed { background:rgba(255,60,60,0.08); color:#ff5555; }
+    .detail-panel-empty { padding:30px 14px; text-align:center; font-size:0.82rem; color:var(--text-dim); }
+    .owned-strike { text-decoration:line-through; opacity:0.5; }
+
+    /* Priority ring infographic */
+    .prio-ring-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .prio-ring { position:relative; width:300px; height:300px; margin:0 auto; }
+    .prio-ring-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; width:90px; height:90px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg-panel); border:2px solid var(--border-dim); border-radius:50%; z-index:2; }
+    .prio-ring-center .ring-count { font-family:'Cinzel',serif; font-size:1.4rem; font-weight:700; color:var(--border-gold); line-height:1; }
+    .prio-ring-center .ring-label { font-size:0.55rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+    .prio-chip { position:absolute; width:48px; height:48px; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; z-index:3; border:2px solid var(--border-gold); background:var(--bg-slot); overflow:hidden; }
+    .prio-chip:hover { transform:translate(-50%,-50%) scale(1.3); z-index:10; }
+    .prio-chip.prio-owned { border-color:var(--uncommon); opacity:0.55; }
+    .prio-chip .prio-icon-link { display:block; width:100%; height:100%; border-radius:4px; font-size:0; line-height:0; color:transparent; overflow:hidden; padding:0 !important; margin:0; text-indent:-9999px; }
+    .prio-chip .prio-icon-link .iconmedium,
+    .prio-chip .prio-icon-link .iconsmall,
+    .prio-chip .prio-icon-link .iconlarge { display:block !important; width:48px !important; height:48px !important; padding:0 !important; margin:0 !important; }
+    .prio-chip .prio-icon-link .iconmedium ins,
+    .prio-chip .prio-icon-link .iconsmall ins,
+    .prio-chip .prio-icon-link .iconlarge ins { display:block !important; width:48px !important; height:48px !important; background-size:cover !important; border-radius:4px; margin:0 !important; }
+    .prio-chip .prio-icon-link .iconmedium del,
+    .prio-chip .prio-icon-link .iconsmall del,
+    .prio-chip .prio-icon-link .iconlarge del { display:none !important; }
+    .prio-chip .prio-num { position:absolute; bottom:-2px; right:-2px; width:16px; height:16px; border-radius:4px; background:var(--bg-dark); border:1px solid var(--border-gold); font-family:'Cinzel',serif; font-size:0.5rem; font-weight:700; color:var(--border-gold); display:flex; align-items:center; justify-content:center; z-index:4; }
+    .prio-chip.prio-owned .prio-num { border-color:var(--uncommon); color:var(--uncommon); }
+    .prio-chip .prio-tooltip { display:none; position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:6px; padding:6px 10px; white-space:nowrap; font-family:'Roboto',sans-serif; font-size:0.7rem; font-weight:400; color:var(--text-gold); z-index:20; pointer-events:none; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
+    .prio-chip .prio-tooltip .tt-meta { font-size:0.6rem; color:var(--text-dim); margin-top:2px; }
+    .prio-chip:hover .prio-tooltip { display:block; }
+    /* Priority legend */
+    .prio-legend { list-style:none; counter-reset:prio; padding:0; margin:8px 0 0 0; width:100%; font-size:0.75rem; }
+    .prio-legend-item { counter-increment:prio; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04); display:flex; align-items:baseline; gap:4px; }
+    .prio-legend-item::before { content:counter(prio) "."; font-family:'Cinzel',serif; font-weight:700; color:var(--border-gold); min-width:18px; font-size:0.7rem; }
+    .prio-legend-name { color:var(--text-gold); font-weight:500; }
+    .prio-legend-meta { color:var(--text-dim); font-size:0.68rem; }
+    .prio-legend-check { color:var(--uncommon); font-weight:700; }
+    .prio-legend-owned { opacity:0.5; }
+    .prio-legend-owned .prio-legend-name { text-decoration:line-through; }
+    /* SVG ring track */
+    .prio-ring svg { position:absolute; top:0; left:0; width:100%; height:100%; }
+
+    /* ===== CHARACTER SHEET — BiS / My Gear Toggle ===== */
+    .sheet-toggle { display:flex; justify-content:center; gap:0; background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:8px; overflow:hidden; width:fit-content; margin:0 auto; }
+    .sheet-toggle-btn { font-size:0.82rem; font-weight:500; padding:8px 24px; background:transparent; color:var(--text-dim); border:none; cursor:pointer; transition:all 0.2s; }
+    .sheet-toggle-btn:hover { color:var(--text-gold); }
+    .sheet-toggle-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-bottom:2px solid var(--border-gold); }
+    .mygear-empty { display:flex; align-items:center; justify-content:center; min-height:24px; font-size:0.75rem; color:#ff5555; font-style:italic; }
+    .mygear-slot.quality-none { border-left-color:#555; }
+    .stat-compare { display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; padding:3px 0; border-bottom:1px solid rgba(42,42,62,0.4); gap:6px; }
+    .stat-compare:last-child { border-bottom:none; }
+    .stat-compare .bis-val { color:var(--border-gold); }
+    .stat-compare .my-val { color:var(--uncommon); }
+    .stat-compare .my-val.lower { color:#ff5555; }
+
+    /* ===== GEAR TRACKER — Typeahead ===== */
+    .typeahead-wrap { flex:1; position:relative; }
+    .typeahead-input { width:100%; padding:5px 28px 5px 8px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:4px; font-family:'Roboto',sans-serif; font-size:0.82rem; outline:none; }
+    .typeahead-input:focus { border-color:var(--border-gold); }
+    .typeahead-input::placeholder { color:var(--text-dim); }
+    .typeahead-clear { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:0.9rem; line-height:1; padding:2px; }
+    .typeahead-clear:hover { color:#ff5555; }
+    .typeahead-dropdown { display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--bg-panel); border:1px solid var(--border-gold); border-top:none; border-radius:0 0 4px 4px; max-height:200px; overflow-y:auto; }
+    .typeahead-dropdown.open { display:block; }
+    .typeahead-option { padding:6px 10px; font-size:0.82rem; cursor:pointer; color:var(--text-gold); border-bottom:1px solid rgba(42,42,62,0.4); }
+    .typeahead-option:last-child { border-bottom:none; }
+    .typeahead-option:hover, .typeahead-option.highlighted { background:rgba(200,170,110,0.12); }
+    .typeahead-option .ta-src { font-size:0.68rem; color:var(--text-dim); }
+
+    /* ===== Profession Filter Buttons ===== */
+    .profession-filters { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; padding:12px 0; }
+    .prof-btn { font-size:0.72rem; font-weight:600; padding:5px 12px; border-radius:16px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-slot); color:var(--text-dim); }
+    .prof-btn:hover { border-color:rgba(200,170,110,0.4); }
+    .prof-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-color:var(--border-gold); }
+
+    /* Responsive */
+    @media (max-width:900px) {
+      .paperdoll-container { grid-template-columns:1fr; }
+      .character-model { order:-1; }
+      .center-column { order:-1; }
+      .stats-row { flex-direction:column; }
+      .weapon-mid { flex-direction:column; align-items:center; }
+      .weapon-mid .gear-slot { width:100%; }
+      .weapon-bottom { flex-direction:column; align-items:center; }
+      .weapon-bottom .gear-slot { width:100%; max-width:100%; }
+      .header-row { grid-template-columns:1fr; justify-items:center; gap:6px; }
+      .header .header-spec { justify-self:center; }
+      .header h1 { font-size:1.2rem; }
+      .spec-tab { font-size:0.72rem; padding:6px 10px; }
+      .view-btn { font-size:0.72rem; padding:6px 10px; }
+      .routes-two-col { grid-template-columns:1fr; }
+      .priority-sidebar { position:static; }
+      .source-list-detail { grid-template-columns:1fr; }
+      .detail-panel { position:static; }
+      .spec-picker-grid { grid-template-columns:1fr 1fr; }
+    }
+
+    /* ===== Import Modal ===== */
+    .import-overlay { position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; }
+    .import-panel { background:var(--bg-panel); border:2px solid var(--border-gold); border-radius:10px; padding:24px; width:560px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+    .import-panel h3 { font-family:'Cinzel',serif; font-size:1.1rem; color:var(--border-gold); margin-bottom:12px; }
+    .import-panel textarea { width:100%; padding:10px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:6px; font-family:monospace; font-size:0.82rem; resize:vertical; outline:none; }
+    .import-panel textarea:focus { border-color:var(--border-gold); }
+    .import-panel .import-instructions { font-size:0.78rem; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
+    .import-btn-row { display:flex; gap:8px; margin-top:12px; }
+    .import-btn-row button { font-size:0.82rem; padding:8px 18px; border-radius:6px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-slot); color:var(--text-gold); }
+    .import-btn-row button:hover { border-color:var(--border-gold); }
+    .import-btn-row .import-primary { background:rgba(200,170,110,0.15); border-color:var(--border-gold); }
+    .import-btn-row .import-cancel { color:var(--text-dim); }
+    .import-msg { font-size:0.82rem; margin-top:10px; padding:8px 12px; border-radius:6px; }
+    .import-msg.success { background:rgba(30,255,0,0.08); color:var(--uncommon); border:1px solid rgba(30,255,0,0.2); }
+    .import-msg.error { background:rgba(255,60,60,0.08); color:#ff5555; border:1px solid rgba(255,60,60,0.2); }
+    .bag-suggestions { margin-top:16px; }
+    .bag-suggestions h4 { font-family:'Cinzel',serif; font-size:0.9rem; color:var(--border-gold); margin-bottom:8px; }
+    .bag-sug-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--bg-slot); border:1px solid var(--border-dim); border-radius:6px; margin-bottom:4px; font-size:0.8rem; }
+    .bag-sug-item .bag-sug-info { flex:1; }
+    .bag-sug-item .bag-sug-slot { font-size:0.68rem; color:var(--text-dim); }
+    .bag-sug-item .bag-sug-equip { font-size:0.72rem; padding:3px 10px; border-radius:4px; cursor:pointer; border:1px solid var(--border-gold); background:rgba(200,170,110,0.12); color:var(--text-gold); }
+    .bag-sug-item .bag-sug-equip:hover { background:rgba(200,170,110,0.25); }
+    .bag-sug-source { font-size:0.68rem; color:var(--text-dim); padding:2px 0 0 10px; }
+    .import-addon-btn { font-size:0.78rem; padding:7px 16px; border-radius:6px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-slot); color:var(--text-gold); display:inline-flex; align-items:center; gap:6px; }
+    .import-addon-btn:hover { border-color:var(--border-gold); background:var(--bg-slot-hover); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-row">
+      <div class="view-tabs" id="viewTabs" style="display:none;">
+        <button class="view-btn active" data-view="sheet">Character Sheet</button>
+        <button class="view-btn" data-view="routes">Gearing Routes</button>
+        <button class="view-btn" data-view="tracker">My Gear Tracker</button>
+      </div>
+      <h1>Tier Zero</h1>
+      <div class="header-spec" id="headerSpec"></div>
+    </div>
+  </div>
+
+  <div id="specPickerOverlay" class="spec-picker-overlay" style="display:none;">
+    <h2>Choose Your Spec</h2>
+    <div class="spec-picker-grid" id="specPickerGrid"></div>
+  </div>
+
+  <div class="view active" id="sheetView"></div>
+  <div class="view" id="routesView"></div>
+  <div class="view" id="trackerView"></div>
+
+<script>
+
+const Q = {legendary:"legendary",epic:"epic",rare:"rare",uncommon:"uncommon"};
+
+const SLOT_LABELS = {
+  head:"Head",neck:"Neck",shoulders:"Shoulders",back:"Back",chest:"Chest",
+  wrists:"Wrists",hands:"Hands",waist:"Waist",legs:"Legs",feet:"Feet",
+  ring1:"Ring 1",ring2:"Ring 2",trinket1:"Trinket 1",trinket2:"Trinket 2",
+  mainhand:"Main Hand",offhand:"Off Hand / Shield",wand:"Wand",twohand:"Two-Hand",libram:"Libram / Relic"
+};
+
+const LEFT_SLOTS = ["head","neck","shoulders","back","chest","wrists","hands"];
+const RIGHT_SLOTS = ["waist","legs","feet","ring1","ring2","trinket1","trinket2"];
+const WEAPON_SLOTS_MH = ["mainhand","offhand","wand","libram"];
+const WEAPON_SLOTS_BOTTOM = ["twohand"];
+
+const SPECS = {
+
+  // =========================================================================
+  // FIRE MAGE
+  // =========================================================================
+  "fire-mage": {
+    class:"Mage",
+    spec:"Fire",
+    classColor:"#69ccf0",
+    icon:"\uD83D\uDD25",
+    notes:"Spellfire Tailoring required for 3 BiS slots. Hit cap: 164 rating (16%).",
+    statWeights:["Spell Power","Hit Rating","Crit Rating","Intellect","Stamina"],
+    hitCap:164,
+    slots:{
+      head:[
+        {name:"Spellstrike Hood",id:24266,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:24,int:12,sp:46,stam:16}},
+        {name:"Mana-Etched Crown",id:28193,q:Q.rare,src:"Black Morass - Aeonus",stats:{int:20,sp:34,stam:27}},
+        {name:"Mana-Binders Cowl",id:32089,q:Q.epic,src:"50 Badges of Justice",stats:{crit:15,int:29,sp:34,stam:38}},
+        {name:"Hood of Oblivion",id:28415,q:Q.rare,src:"Arcatraz - Skyriss",stats:{int:32,sp:40,stam:27}},
+        {name:"Incanter's Cowl",id:28278,q:Q.rare,src:"Mechanar - Pathaleon",stats:{crit:19,int:27,sp:29,spi:17,stam:15}}
+      ],
+      neck:[
+        {name:"Brooch of Heightened Potential",id:28134,q:Q.rare,src:"Shadow Labyrinth - Blackheart",stats:{crit:14,int:14,sp:22,stam:15}},
+        {name:"Manasurge Pendant",id:29368,q:Q.epic,src:"Badges of Justice",stats:{int:22,sp:28,stam:24}},
+        {name:"Chain of the Twilight Owl",id:24121,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{def:18,int:19,sp:21}},
+        {name:"Eye of the Night",id:24116,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{crit:26}},
+        {name:"Hydra-fang Necklace",id:27758,q:Q.rare,src:"Heroic Underbog - Ghaz'an",stats:{int:16,sp:19,stam:17}}
+      ],
+      shoulders:[
+        {name:"Mana-Etched Spaulders",id:27796,q:Q.rare,src:"Heroic Slave Pens - Quagmirran",stats:{crit:16,int:17,sp:20,stam:25}},
+        {name:"Spaulders of Oblivion",id:27778,q:Q.rare,src:"Shadow Lab - Murmur",stats:{int:17,sp:29,stam:25}},
+        {name:"Mantle of Three Terrors",id:27994,q:Q.rare,src:"Black Morass - Chrono Lord Deja",stats:{int:25,sp:29,stam:29}},
+        {name:"Rime Covered Mantle",id:22983,q:Q.epic,src:"Classic Naxx - Gluth",stats:{int:12,sp:39,stam:12}}
+      ],
+      back:[
+        {name:"Cloak of the Necropolis",id:23050,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{int:11,sp:26,stam:12}},
+        {name:"Shawl of Shifting Probabilities",id:29369,q:Q.epic,src:"Badges of Justice",stats:{crit:22,int:16,sp:21,stam:18}},
+        {name:"Sethekk Oracle Cloak",id:27981,q:Q.rare,src:"Sethekk Halls - Ikiss",stats:{int:18,sp:22,stam:18}},
+        {name:"Cloak of the Black Void",id:24252,q:Q.rare,src:"Tailoring (BoE)",stats:{int:11,sp:35}}
+      ],
+      chest:[
+        {name:"Spellfire Robe",id:21848,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:28,int:17,sp:72}},
+        {name:"Mana-Etched Vestments",id:28191,q:Q.rare,src:"Old Hillsbrad - Epoch Hunter",stats:{crit:17,int:25,sp:29,stam:25}},
+        {name:"Robe of Oblivion",id:28232,q:Q.rare,src:"Shadow Lab - Murmur",stats:{int:20,sp:40,stam:30}},
+        {name:"Warp Infused Drape",id:28342,q:Q.rare,src:"Botanica - Warp Splinter",stats:{int:28,sp:30,stam:27}}
+      ],
+      wrists:[
+        {name:"Bracers of Havok",id:24250,q:Q.rare,src:"Tailoring (BoE)",stats:{int:12,sp:30}},
+        {name:"Bands of Negation",id:29240,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:22,sp:29,stam:25}},
+        {name:"Crimson Bracers of Gloom",id:27462,q:Q.rare,src:"Heroic Ramparts - Omor",stats:{int:18,sp:22,stam:18}}
+      ],
+      hands:[
+        {name:"Spellfire Gloves",id:21847,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:23,int:10,sp:50}},
+        {name:"Gloves of Oblivion",id:27537,q:Q.rare,src:"Shattered Halls - Kargath",stats:{int:21,sp:26,stam:33}},
+        {name:"Mana-Etched Gloves",id:27465,q:Q.rare,src:"Heroic Ramparts - Lt. Drake",stats:{crit:16,int:17,sp:20,stam:25}}
+      ],
+      waist:[
+        {name:"Spellfire Belt",id:21846,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:18,int:18,sp:50}},
+        {name:"Girdle of Ruination",id:24256,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:20,int:13,sp:39,stam:18}},
+        {name:"Belt of Depravity",id:29241,q:Q.epic,src:"Heroic Arcatraz - Skyriss",stats:{int:27,sp:34,stam:31}}
+      ],
+      legs:[
+        {name:"Spellstrike Pants",id:24262,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:26,int:8,sp:46,stam:12}},
+        {name:"Breeches of the Occultist",id:30531,q:Q.epic,src:"Heroic Black Morass - Aeonus",stats:{crit:23,int:22,sp:36,stam:37}},
+        {name:"Khadgar's Kilt of Abjuration",id:28185,q:Q.rare,src:"Black Morass - Temporus",stats:{int:22,sp:36,spi:15,stam:20}}
+      ],
+      feet:[
+        {name:"Sigil-Laced Boots",id:28406,q:Q.rare,src:"Arcatraz - Skyriss",stats:{crit:17,int:18,sp:20,stam:24}},
+        {name:"Boots of Blasphemy",id:29242,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:29,sp:36,stam:36}},
+        {name:"Shattrath Jumpers",id:28179,q:Q.rare,src:"Quest: Brother Against Brother",stats:{int:17,sp:29,stam:25}}
+      ],
+      ring1:[
+        {name:"Ashyen's Gift",id:29172,q:Q.epic,src:"Cenarion Expedition - Exalted",stats:{sp:23,stam:30}},
+        {name:"Ring of Cryptic Dreams",id:29367,q:Q.epic,src:"Badges of Justice",stats:{crit:20,int:17,sp:23,stam:16}},
+        {name:"Seer's Signet",id:29126,q:Q.epic,src:"Scryers - Revered",stats:{crit:12,sp:34,stam:24}}
+      ],
+      ring2:[
+        {name:"Cobalt Band of Tyrigosa",id:29352,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:17,sp:35,stam:19}},
+        {name:"Seal of the Exorcist",id:28555,q:Q.epic,src:"Spirit Shard Vendor",stats:{res:11,sp:28,stam:24}},
+        {name:"Manastorm Band",id:30366,q:Q.rare,src:"Quest: Shutting Down Manaforge Ara",stats:{crit:10,int:15,sp:29}}
+      ],
+      trinket1:[
+        {name:"Quagmirran's Eye",id:27683,q:Q.rare,src:"Heroic Slave Pens - Quagmirran",stats:{sp:37}},
+        {name:"Icon of the Silver Crescent",id:29370,q:Q.epic,src:"41 Badges of Justice",stats:{sp:43}},
+        {name:"Shiffar's Nexus-Horn",id:28418,q:Q.rare,src:"Heroic Mana-Tombs - Pandemonius",stats:{crit:30}}
+      ],
+      trinket2:[
+        {name:"The Restrained Essence of Sapphiron",id:23046,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{sp:40}},
+        {name:"Neltharion's Tear",id:19379,q:Q.epic,src:"Classic BWL - Vaelastrasz",stats:{sp:44}},
+        {name:"Xi'ri's Gift",id:29179,q:Q.rare,src:"Aldor - Honored",stats:{crit:32}}
+      ],
+      mainhand:[
+        {name:"Eternium Runed Blade",id:23554,q:Q.epic,src:"World Drop (BoE)",stats:{crit:21,int:19,sp:168}},
+        {name:"Stormcaller",id:29155,q:Q.epic,src:"Sha'tar - Exalted",stats:{crit:21,int:12,sp:159,stam:12}},
+        {name:"Blade of the Archmage",id:29153,q:Q.epic,src:"Aldor - Exalted",stats:{crit:21,int:11,sp:159,stam:13}},
+        {name:"Continuum Blade",id:29185,q:Q.rare,src:"Keepers of Time - Honored",stats:{int:11,sp:121,stam:30}}
+      ],
+      twohand:[
+        {name:"Atiesh, Greatstaff of the Guardian",id:22589,q:Q.legendary,src:"Classic Naxx Quest",stats:{int:32,sp:150,spi:24,stam:31}},
+        {name:"Terokk's Shadowstaff",id:29355,q:Q.epic,src:"Sethekk Halls - Ikiss",stats:{crit:37,int:42,sp:168,stam:40}}
+      ],
+      offhand:[
+        {name:"Lamp of Peaceful Radiance",id:28412,q:Q.rare,src:"Shadow Labyrinth",stats:{crit:13,int:14,sp:21,stam:13}},
+        {name:"Star-Heart Lamp",id:28187,q:Q.rare,src:"Black Morass",stats:{int:18,sp:22,stam:17}},
+        {name:"Sapphiron's Left Eye",id:23049,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{int:8,sp:26,stam:12}}
+      ],
+      wand:[
+        {name:"Nether Core's Control Rod",id:28386,q:Q.rare,src:"Mechanar - Pathaleon",stats:{int:10,sp:13,stam:9}},
+        {name:"The Black Stalk",id:29350,q:Q.epic,src:"Classic Naxx - Kel'Thuzad",stats:{crit:11,sp:20,stam:10}},
+        {name:"Doomfinger",id:22821,q:Q.epic,src:"Classic Naxx - Patchwerk",stats:{sp:16}}
+      ]
+    }
+  },
+
+  // =========================================================================
+  // ARCANE MAGE
+  // =========================================================================
+  "arcane-mage": {
+    class:"Mage",
+    spec:"Arcane",
+    classColor:"#69ccf0",
+    icon:"\u2728",
+    notes:"Spellfire Tailoring BiS. Arcane needs mana sustain + hit cap.",
+    statWeights:["Spell Power","Hit Rating","Crit Rating","Intellect","Stamina"],
+    hitCap:164,
+    slots:{
+      head:[
+        {name:"Mana-Binders Cowl",id:32089,q:Q.epic,src:"50 Badges of Justice",stats:{crit:15,int:29,sp:34,stam:38}},
+        {name:"Spellstrike Hood",id:24266,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:24,int:12,sp:46,stam:16}},
+        {name:"Hood of Oblivion",id:28415,q:Q.rare,src:"Arcatraz - Skyriss",stats:{int:32,sp:40,stam:27}},
+        {name:"Incanter's Cowl",id:28278,q:Q.rare,src:"Mechanar - Pathaleon",stats:{crit:19,int:27,sp:29,spi:17,stam:15}},
+        {name:"Mana-Etched Crown",id:28193,q:Q.rare,src:"Black Morass - Aeonus",stats:{int:20,sp:34,stam:27}}
+      ],
+      neck:[
+        {name:"Brooch of Heightened Potential",id:28134,q:Q.rare,src:"Shadow Labyrinth - Blackheart",stats:{crit:14,int:14,sp:22,stam:15}},
+        {name:"Manasurge Pendant",id:29368,q:Q.epic,src:"Badges of Justice",stats:{int:22,sp:28,stam:24}},
+        {name:"Chain of the Twilight Owl",id:24121,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{def:18,int:19,sp:21}},
+        {name:"Eye of the Night",id:24116,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{crit:26}},
+        {name:"Hydra-fang Necklace",id:27758,q:Q.rare,src:"Heroic Underbog - Ghaz'an",stats:{int:16,sp:19,stam:17}}
+      ],
+      shoulders:[
+        {name:"Mana-Etched Spaulders",id:27796,q:Q.rare,src:"Heroic Slave Pens - Quagmirran",stats:{crit:16,int:17,sp:20,stam:25}},
+        {name:"Spaulders of Oblivion",id:27778,q:Q.rare,src:"Shadow Lab - Murmur",stats:{int:17,sp:29,stam:25}},
+        {name:"Mantle of Three Terrors",id:27994,q:Q.rare,src:"Black Morass - Chrono Lord Deja",stats:{int:25,sp:29,stam:29}},
+        {name:"Rime Covered Mantle",id:22983,q:Q.epic,src:"Classic Naxx - Gluth",stats:{int:12,sp:39,stam:12}}
+      ],
+      back:[
+        {name:"Cloak of the Necropolis",id:23050,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{int:11,sp:26,stam:12}},
+        {name:"Shawl of Shifting Probabilities",id:29369,q:Q.epic,src:"Badges of Justice",stats:{crit:22,int:16,sp:21,stam:18}},
+        {name:"Sethekk Oracle Cloak",id:27981,q:Q.rare,src:"Sethekk Halls - Ikiss",stats:{int:18,sp:22,stam:18}},
+        {name:"Cloak of the Black Void",id:24252,q:Q.rare,src:"Tailoring (BoE)",stats:{int:11,sp:35}}
+      ],
+      chest:[
+        {name:"Spellfire Robe",id:21848,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:28,int:17,sp:72}},
+        {name:"Mana-Etched Vestments",id:28191,q:Q.rare,src:"Old Hillsbrad - Epoch Hunter",stats:{crit:17,int:25,sp:29,stam:25}},
+        {name:"Robe of Oblivion",id:28232,q:Q.rare,src:"Shadow Lab - Murmur",stats:{int:20,sp:40,stam:30}},
+        {name:"Warp Infused Drape",id:28342,q:Q.rare,src:"Botanica - Warp Splinter",stats:{int:28,sp:30,stam:27}}
+      ],
+      wrists:[
+        {name:"Bracers of Havok",id:24250,q:Q.rare,src:"Tailoring (BoE)",stats:{int:12,sp:30}},
+        {name:"Bands of Negation",id:29240,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:22,sp:29,stam:25}},
+        {name:"Crimson Bracers of Gloom",id:27462,q:Q.rare,src:"Heroic Ramparts - Omor",stats:{int:18,sp:22,stam:18}}
+      ],
+      hands:[
+        {name:"Spellfire Gloves",id:21847,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:23,int:10,sp:50}},
+        {name:"Gloves of Oblivion",id:27537,q:Q.rare,src:"Shattered Halls - Kargath",stats:{int:21,sp:26,stam:33}},
+        {name:"Mana-Etched Gloves",id:27465,q:Q.rare,src:"Heroic Ramparts - Lt. Drake",stats:{crit:16,int:17,sp:20,stam:25}}
+      ],
+      waist:[
+        {name:"Spellfire Belt",id:21846,q:Q.epic,src:"Spellfire Tailoring (BoP)",stats:{crit:18,int:18,sp:50}},
+        {name:"Girdle of Ruination",id:24256,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:20,int:13,sp:39,stam:18}},
+        {name:"Belt of Depravity",id:29241,q:Q.epic,src:"Heroic Arcatraz - Skyriss",stats:{int:27,sp:34,stam:31}}
+      ],
+      legs:[
+        {name:"Spellstrike Pants",id:24262,q:Q.epic,src:"Tailoring (BoE)",stats:{crit:26,int:8,sp:46,stam:12}},
+        {name:"Breeches of the Occultist",id:30531,q:Q.epic,src:"Heroic Black Morass - Aeonus",stats:{crit:23,int:22,sp:36,stam:37}},
+        {name:"Khadgar's Kilt of Abjuration",id:28185,q:Q.rare,src:"Black Morass - Temporus",stats:{int:22,sp:36,spi:15,stam:20}}
+      ],
+      feet:[
+        {name:"Sigil-Laced Boots",id:28406,q:Q.rare,src:"Arcatraz - Skyriss",stats:{crit:17,int:18,sp:20,stam:24}},
+        {name:"Boots of Blasphemy",id:29242,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:29,sp:36,stam:36}},
+        {name:"Shattrath Jumpers",id:28179,q:Q.rare,src:"Quest: Brother Against Brother",stats:{int:17,sp:29,stam:25}}
+      ],
+      ring1:[
+        {name:"Ashyen's Gift",id:29172,q:Q.epic,src:"Cenarion Expedition - Exalted",stats:{sp:23,stam:30}},
+        {name:"Ring of Cryptic Dreams",id:29367,q:Q.epic,src:"Badges of Justice",stats:{crit:20,int:17,sp:23,stam:16}},
+        {name:"Seer's Signet",id:29126,q:Q.epic,src:"Scryers - Revered",stats:{crit:12,sp:34,stam:24}}
+      ],
+      ring2:[
+        {name:"Cobalt Band of Tyrigosa",id:29352,q:Q.epic,src:"Heroic Mana-Tombs - Shaffar",stats:{int:17,sp:35,stam:19}},
+        {name:"Seal of the Exorcist",id:28555,q:Q.epic,src:"Spirit Shard Vendor",stats:{res:11,sp:28,stam:24}},
+        {name:"Manastorm Band",id:30366,q:Q.rare,src:"Quest: Shutting Down Manaforge Ara",stats:{crit:10,int:15,sp:29}}
+      ],
+      trinket1:[
+        {name:"Quagmirran's Eye",id:27683,q:Q.rare,src:"Heroic Slave Pens - Quagmirran",stats:{sp:37}},
+        {name:"Icon of the Silver Crescent",id:29370,q:Q.epic,src:"41 Badges of Justice",stats:{sp:43}},
+        {name:"Shiffar's Nexus-Horn",id:28418,q:Q.rare,src:"Heroic Mana-Tombs - Pandemonius",stats:{crit:30}}
+      ],
+      trinket2:[
+        {name:"The Restrained Essence of Sapphiron",id:23046,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{sp:40}},
+        {name:"Neltharion's Tear",id:19379,q:Q.epic,src:"Classic BWL - Vaelastrasz",stats:{sp:44}},
+        {name:"Xi'ri's Gift",id:29179,q:Q.rare,src:"Aldor - Honored",stats:{crit:32}}
+      ],
+      mainhand:[
+        {name:"Eternium Runed Blade",id:23554,q:Q.epic,src:"World Drop (BoE)",stats:{crit:21,int:19,sp:168}},
+        {name:"Stormcaller",id:29155,q:Q.epic,src:"Sha'tar - Exalted",stats:{crit:21,int:12,sp:159,stam:12}},
+        {name:"Blade of the Archmage",id:29153,q:Q.epic,src:"Aldor - Exalted",stats:{crit:21,int:11,sp:159,stam:13}},
+        {name:"Continuum Blade",id:29185,q:Q.rare,src:"Keepers of Time - Honored",stats:{int:11,sp:121,stam:30}}
+      ],
+      twohand:[
+        {name:"Atiesh, Greatstaff of the Guardian",id:22589,q:Q.legendary,src:"Classic Naxx Quest",stats:{int:32,sp:150,spi:24,stam:31}},
+        {name:"Terokk's Shadowstaff",id:29355,q:Q.epic,src:"Sethekk Halls - Ikiss",stats:{crit:37,int:42,sp:168,stam:40}}
+      ],
+      offhand:[
+        {name:"Lamp of Peaceful Radiance",id:28412,q:Q.rare,src:"Shadow Labyrinth",stats:{crit:13,int:14,sp:21,stam:13}},
+        {name:"Star-Heart Lamp",id:28187,q:Q.rare,src:"Black Morass",stats:{int:18,sp:22,stam:17}},
+        {name:"Sapphiron's Left Eye",id:23049,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{int:8,sp:26,stam:12}}
+      ],
+      wand:[
+        {name:"Nether Core's Control Rod",id:28386,q:Q.rare,src:"Mechanar - Pathaleon",stats:{int:10,sp:13,stam:9}},
+        {name:"The Black Stalk",id:29350,q:Q.epic,src:"Classic Naxx - Kel'Thuzad",stats:{crit:11,sp:20,stam:10}},
+        {name:"Doomfinger",id:22821,q:Q.epic,src:"Classic Naxx - Patchwerk",stats:{sp:16}}
+      ]
+    }
+  },
+
+  // =========================================================================
+  // RETRIBUTION PALADIN
+  // =========================================================================
+  "ret-paladin": {
+    class:"Paladin",
+    spec:"Retribution",
+    classColor:"#f58cba",
+    icon:"\u2694\uFE0F",
+    notes:"Blacksmithing (Weaponsmith) highly recommended. Expertise is king.",
+    statWeights:["Hit Rating","Expertise","Strength","Crit Rating","Attack Power"],
+    hitCap:95,
+    slots:{
+      head:[
+        {name:"Mask of the Deceiver",id:32087,q:Q.epic,src:"50 Badges of Justice",stats:{agi:32,ap:64,hit:16,stam:36}},
+        {name:"Wastewalker Helm",id:28224,q:Q.rare,src:"Old Hillsbrad - Epoch Hunter",stats:{ap:56,crit:22,hit:18,stam:30}},
+        {name:"Helm of Assassination",id:28414,q:Q.rare,src:"Arcatraz - Skyriss",stats:{ap:66,crit:25,stam:25}}
+      ],
+      neck:[
+        {name:"Choker of Vile Intent",id:29381,q:Q.epic,src:"25 Badges of Justice",stats:{agi:20,ap:42,hit:18,stam:18}},
+        {name:"Haramad's Bargain",id:29119,q:Q.epic,src:"Consortium - Exalted",stats:{agi:25,str:26}},
+        {name:"Necklace of Trophies",id:31275,q:Q.rare,src:"World Drop (BoE)",stats:{agi:15,hit:14,str:22}}
+      ],
+      shoulders:[
+        {name:"Ragesteel Shoulders",id:33173,q:Q.rare,src:"Blacksmithing (BoE)",stats:{crit:17,hit:9,stam:12,str:32}},
+        {name:"Wastewalker Shoulderpads",id:27797,q:Q.rare,src:"Auchenai Crypts - Avatar",stats:{agi:25,ap:34,hit:16,stam:13}},
+        {name:"Mantle of Perenolde",id:27434,q:Q.rare,src:"Old Hillsbrad - Epoch Hunter",stats:{ap:20,crit:23,hit:23,stam:24}}
+      ],
+      back:[
+        {name:"Vengeance Wrap",id:24259,q:Q.epic,src:"Tailoring (BoE)",stats:{ap:52,crit:23}},
+        {name:"Blood Knight War Cloak",id:29382,q:Q.epic,src:"25 Badges of Justice",stats:{agi:23,ap:48,stam:22}},
+        {name:"Cloak of the Inciter",id:27892,q:Q.rare,src:"Shadow Lab - Blackheart",stats:{ap:30,crit:18,hit:16,stam:15}}
+      ],
+      chest:[
+        {name:"Ragesteel Breastplate",id:23522,q:Q.rare,src:"Blacksmithing (BoE)",stats:{crit:29,str:50}},
+        {name:"Doomplate Chestguard",id:28403,q:Q.rare,src:"Arcatraz - Skyriss",stats:{crit:19,stam:27,str:30}},
+        {name:"Vest of Vengeance",id:24396,q:Q.rare,src:"Blood Furnace - Keli'dan",stats:{agi:27,ap:42,hit:11,stam:18}}
+      ],
+      wrists:[
+        {name:"Black Felsteel Bracers",id:23537,q:Q.epic,src:"Blacksmithing (BoE)",stats:{crit:22,stam:15,str:26}},
+        {name:"Nightfall Wristguards",id:29246,q:Q.epic,src:"Old Hillsbrad - Epoch Hunter",stats:{agi:24,ap:46,stam:22}},
+        {name:"Bands of Syth",id:27918,q:Q.rare,src:"Sethekk Halls - Darkweaver Syth",stats:{agi:19,stam:18,str:21}}
+      ],
+      hands:[
+        {name:"Flesh Handler's Gauntlets",id:30341,q:Q.uncommon,src:"Quest: The Flesh Lies...",stats:{agi:17,exp:18,stam:27,str:18}},
+        {name:"Ragesteel Gloves",id:23520,q:Q.rare,src:"Blacksmithing (BoE)",stats:{crit:27,str:35}},
+        {name:"Fel Leather Gloves",id:25685,q:Q.rare,src:"Leatherworking (BoE)",stats:{ap:36,crit:24,hit:17}}
+      ],
+      waist:[
+        {name:"Girdle of the Deathdealer",id:29247,q:Q.epic,src:"Heroic Black Morass - Aeonus",stats:{agi:28,ap:56,hit:20,stam:28}},
+        {name:"Deathforge Girdle",id:27985,q:Q.rare,src:"Sethekk Halls - Ikiss",stats:{crit:20,stam:25,str:22}},
+        {name:"Ebon Netherscale Belt",id:29516,q:Q.epic,src:"Dragonscale LW (BoP)",stats:{ap:48,crit:22,int:14,mp5:8,stam:21}}
+      ],
+      legs:[
+        {name:"Shattrath Leggings",id:30257,q:Q.rare,src:"Quest: Special Delivery to Shattrath",stats:{agi:25,exp:22,stam:27,str:35}},
+        {name:"Vanquisher's Legplates",id:30533,q:Q.epic,src:"Mechanar - Pathaleon",stats:{crit:23,stam:36,str:36}},
+        {name:"Clefthoof Hide Leggings",id:31544,q:Q.rare,src:"Quest: Showdown",stats:{agi:30,exp:18,hit:17,stam:24,str:30}}
+      ],
+      feet:[
+        {name:"Fel Leather Boots",id:25686,q:Q.rare,src:"Leatherworking (BoE)",stats:{ap:36,crit:17,hit:25}},
+        {name:"Boots of the Unjust",id:27867,q:Q.rare,src:"Auchenai Crypts - Maladaar",stats:{ap:64,crit:19,hit:13,stam:25}},
+        {name:"Obsidian Clodstompers",id:28318,q:Q.rare,src:"Botanica - Freywinn",stats:{stam:30,str:34}}
+      ],
+      ring1:[
+        {name:"Shapeshifter's Signet",id:30834,q:Q.epic,src:"Lower City - Exalted",stats:{agi:25,exp:20,stam:18}},
+        {name:"A'dal's Command",id:29177,q:Q.epic,src:"Sha'tar - Exalted",stats:{agi:16,stam:18,str:29}},
+        {name:"Shaffar's Band of Brutality",id:31920,q:Q.epic,src:"Heroic Mana-Tombs",stats:{ap:40,crit:20,hit:19}}
+      ],
+      ring2:[
+        {name:"Overseer's Signet",id:30365,q:Q.rare,src:"Quest: Shutting Down Manaforge Ara (Aldor)",stats:{agi:15,hit:10,str:25}},
+        {name:"Acrobat's Mark of the Sha'tar",id:31380,q:Q.rare,src:"Quest: Battle of the Crimson Watch",stats:{agi:12,str:29}}
+      ],
+      trinket1:[
+        {name:"Bloodlust Brooch",id:29383,q:Q.epic,src:"41 Badges of Justice",stats:{ap:72}},
+        {name:"Abacus of Violent Odds",id:28288,q:Q.rare,src:"Mechanar - Pathaleon",stats:{ap:64}},
+        {name:"Hourglass of the Unraveller",id:28034,q:Q.rare,src:"Black Morass - Temporus",stats:{crit:32}}
+      ],
+      trinket2:[
+        {name:"Kiss of the Spider",id:22954,q:Q.epic,src:"Classic Naxx - Maexxna",stats:{hit:14,crit:28}},
+        {name:"Slayer's Crest",id:23041,q:Q.epic,src:"Classic Naxx - Sapphiron",stats:{ap:64}},
+        {name:"Hourglass of the Unraveller",id:28034,q:Q.rare,src:"Black Morass - Temporus",stats:{crit:32}}
+      ],
+      mainhand:[
+        {name:"Lionheart Champion",id:28429,q:Q.epic,src:"BS - Master Swordsmithing (BoP)",stats:{agi:44,str:49}},
+        {name:"Deep Thunder",id:28441,q:Q.epic,src:"BS - Master Hammersmithing (BoP)",stats:{agi:37,stam:55,str:37}},
+        {name:"Quantum Blade",id:29356,q:Q.epic,src:"Black Morass - Aeonus",stats:{ap:102,crit:30,stam:31}},
+        {name:"The Hammer of Destiny",id:31322,q:Q.epic,src:"World Drop (BoE)",stats:{int:29,stam:30,str:32}}
+      ],
+      libram:[
+        {name:"Libram of Avengement",id:27484,q:Q.rare,src:"Blood Furnace - The Maker",stats:{str:0}},
+        {name:"Libram of Righteous Power",id:31033,q:Q.rare,src:"Quest: News of Victory",stats:{str:0}}
+      ]
+    }
+  },
+
+  // =========================================================================
+  // PROTECTION PALADIN
+  // =========================================================================
+  "prot-paladin": {
+    class:"Paladin",
+    spec:"Protection",
+    classColor:"#f58cba",
+    icon:"\uD83D\uDEE1\uFE0F",
+    notes:"Goal: Crush immunity (102.4%) and crit immunity (490 Defense).",
+    statWeights:["Defense","Stamina","Dodge","Block Rating","Spell Power"],
+    defCap:490,
+    slots:{
+      head:[
+        {name:"Faceguard of Determination",id:32083,q:Q.epic,src:"50 Badges of Justice",stats:{block:24,def:32,dodge:24,stam:36}},
+        {name:"Helm of the Righteous",id:28285,q:Q.rare,src:"Mechanar - Pathaleon",stats:{def:21,int:20,mp5:6,sp:23,stam:30}},
+        {name:"Felsteel Helm",id:23519,q:Q.rare,src:"Blacksmithing",stats:{def:33,stam:27}}
+      ],
+      neck:[
+        {name:"Strength of the Untamed",id:29173,q:Q.rare,src:"Cenarion Expedition - Revered",stats:{def:19,dodge:18,stam:27}},
+        {name:"Mark of the Ravenguard",id:29336,q:Q.rare,src:"Heroic Dungeon Drop",stats:{def:17,stam:40}},
+        {name:"Chain of the Twilight Owl",id:24121,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{def:18,int:19,sp:21}}
+      ],
+      shoulders:[
+        {name:"Spaulders of the Righteous",id:27739,q:Q.rare,src:"Botanica - Laj",stats:{def:20,int:22,sp:15,stam:22}},
+        {name:"Shoulderguards of the Bold",id:27803,q:Q.rare,src:"Shadow Lab - Murmur",stats:{def:17,stam:25,str:25}},
+        {name:"Fanblade Pauldrons",id:27847,q:Q.rare,src:"Heroic Auchenai - Shirrak",stats:{def:20,parry:15,stam:22,str:16}}
+      ],
+      back:[
+        {name:"Devilshark Cape",id:27804,q:Q.rare,src:"Steamvault - Kalithresh",stats:{def:20,dodge:18,stam:22}},
+        {name:"Farstrider Defender's Cloak",id:29385,q:Q.epic,src:"25 Badges of Justice",stats:{stam:30}},
+        {name:"Cloak of Eternity",id:24253,q:Q.rare,src:"Tailoring (BoE)",stats:{def:23,stam:36}}
+      ],
+      chest:[
+        {name:"Breastplate of the Righteous",id:28203,q:Q.rare,src:"Steamvault - Kalithresh",stats:{def:20,int:28,sp:23,stam:30}},
+        {name:"Jade-Skull Breastplate",id:28262,q:Q.rare,src:"Mechanar - Sepethrea",stats:{block:23,def:25,stam:50,str:30}},
+        {name:"Vindicator's Hauberk",id:29127,q:Q.rare,src:"Aldor - Revered",stats:{def:46,dodge:19,stam:39}}
+      ],
+      wrists:[
+        {name:"Bracers of Dignity",id:29252,q:Q.epic,src:"Heroic Arcatraz - Skyriss",stats:{def:21,int:12,sp:19,stam:30}},
+        {name:"Bracers of the Green Fortress",id:23538,q:Q.epic,src:"Blacksmithing",stats:{def:17,dodge:10,stam:39}},
+        {name:"Vambraces of Daring",id:27459,q:Q.rare,src:"Heroic Ramparts - Vazruden",stats:{def:11,stam:26,str:18}}
+      ],
+      hands:[
+        {name:"Gauntlets of the Righteous",id:27535,q:Q.rare,src:"Shattered Halls - Kargath",stats:{def:19,int:20,mp5:7,sp:21,stam:22}},
+        {name:"Felsteel Gloves",id:23517,q:Q.rare,src:"Blacksmithing",stats:{def:25,stam:27}},
+        {name:"Thatia's Self-Correcting Gauntlets",id:28390,q:Q.rare,src:"Arcatraz - Dalliah",stats:{def:18,stam:35,str:16}}
+      ],
+      waist:[
+        {name:"Girdle of Valorous Deeds",id:29253,q:Q.epic,src:"Heroic Black Morass - Aeonus",stats:{block:16,def:24,int:22,sp:20,stam:37}},
+        {name:"Lion's Heart Girdle",id:29238,q:Q.epic,src:"Heroic Ramparts - Vazruden",stats:{agi:22,def:23,stam:31,str:26}},
+        {name:"Sha'tari Vindicator's Waistguard",id:31460,q:Q.rare,src:"Quest: How to Break Into the Arcatraz",stats:{block:24,def:20,stam:33}}
+      ],
+      legs:[
+        {name:"Timewarden's Leggings",id:29184,q:Q.rare,src:"Keepers of Time - Revered",stats:{def:18,dodge:11,stam:57}},
+        {name:"Legplates of the Righteous",id:27839,q:Q.rare,src:"Black Morass - Aeonus",stats:{def:26,int:24,mp5:10,sp:28,stam:27}},
+        {name:"Felsteel Leggings",id:23518,q:Q.rare,src:"Blacksmithing",stats:{def:33,stam:39}}
+      ],
+      feet:[
+        {name:"Boots of the Righteous Path",id:29254,q:Q.epic,src:"Heroic Black Morass",stats:{def:23,int:26,sp:28,stam:34}},
+        {name:"Eaglecrest Warboots",id:29239,q:Q.epic,src:"Heroic Ramparts",stats:{agi:21,def:24,stam:33,str:29}},
+        {name:"Boots of the Colossus",id:27813,q:Q.rare,src:"Heroic Slave Pens",stats:{def:19,stam:27,str:22}}
+      ],
+      ring1:[
+        {name:"Band of Impenetrable Defenses",id:31319,q:Q.epic,src:"Heroic Dungeon Drop",stats:{def:26,stam:36}},
+        {name:"Seal of the Exorcist",id:28555,q:Q.epic,src:"Spirit Shard Vendor",stats:{res:11,sp:28,stam:24}},
+        {name:"Ring of Unyielding Force",id:29384,q:Q.epic,src:"World Boss - Doomwalker",stats:{def:22,stam:31}}
+      ],
+      ring2:[
+        {name:"Crystal Band of Valor",id:27822,q:Q.rare,src:"World Drop / AH",stats:{def:22,hit:16,stam:27}},
+        {name:"Delicate Eternium Ring",id:24088,q:Q.rare,src:"Jewelcrafting",stats:{agi:25,dodge:16,stam:15}},
+        {name:"Protector's Mark of the Redemption",id:31078,q:Q.rare,src:"Quest Reward",stats:{def:25,stam:22}}
+      ],
+      trinket1:[
+        {name:"Dabiri's Enigma",id:30300,q:Q.rare,src:"Quest: Dimensius the All-Devouring",stats:{def:30}},
+        {name:"Figurine - Dawnstone Crab",id:24125,q:Q.rare,src:"Jewelcrafting (BoP)",stats:{def:32}},
+        {name:"Adamantine Figurine",id:27891,q:Q.rare,src:"Heroic Dungeon Drop",stats:{def:32}}
+      ],
+      trinket2:[
+        {name:"Figurine of the Colossus",id:27529,q:Q.rare,src:"Heroic Shattered Halls",stats:{block:32}},
+        {name:"Regal Protectorate",id:28042,q:Q.rare,src:"Heroic Dungeon Drop",stats:{def:26}},
+        {name:"Goblin Rocket Launcher",id:23836,q:Q.rare,src:"Engineering",stats:{stam:45}}
+      ],
+      mainhand:[
+        {name:"Gavel of Unearthed Secrets",id:30832,q:Q.epic,src:"Badges of Justice",stats:{crit:15,int:16,sp:159,stam:24}},
+        {name:"Stormcaller",id:29155,q:Q.epic,src:"Sha'tar - Exalted",stats:{crit:21,int:12,sp:159,stam:12}},
+        {name:"Continuum Blade",id:29185,q:Q.rare,src:"Keepers of Time - Honored",stats:{int:11,sp:121,stam:30}}
+      ],
+      offhand:[
+        {name:"Crest of the Sha'tar",id:29176,q:Q.epic,src:"Sha'tar - Exalted",stats:{def:13,stam:19}},
+        {name:"Azure-Shield of Coldarra",id:29266,q:Q.epic,src:"Heroic Dungeon Drop",stats:{def:22,stam:31}},
+        {name:"Aegis of the Sunbird",id:28316,q:Q.rare,src:"Heroic Dungeon Drop",stats:{def:19,stam:27}}
+      ],
+      libram:[
+        {name:"Libram of Repentance",id:29388,q:Q.epic,src:"Badges of Justice",stats:{block:0}},
+        {name:"Libram of the Eternal Rest",id:27917,q:Q.rare,src:"Heroic Dungeon Drop",stats:{sp:0}}
+      ]
+    }
+  },
+
+  // =========================================================================
+  // HOLY PALADIN
+  // =========================================================================
+  "holy-paladin": {
+    class:"Paladin",
+    spec:"Holy",
+    classColor:"#f58cba",
+    icon:"\u271D\uFE0F",
+    notes:"Windhawk LW or Primal Mooncloth Tailoring are strong set options.",
+    statWeights:["+Healing","Intellect","MP5","Crit Rating","Stamina"],
+    slots:{
+      head:[
+        {name:"Helmet of the Steadfast Champion",id:32084,q:Q.epic,src:"Badges of Justice - G'eras",stats:{int:24,mp5:10,stam:36}},
+        {name:"Whitemend Hood",id:24264,q:Q.epic,src:"Tailoring (Whitemend Set)",stats:{int:15,mp5:11,stam:15}},
+        {name:"Hallowed Crown",id:28413,q:Q.rare,src:"Arcatraz - Skyriss",stats:{int:24,spi:26,stam:12}},
+        {name:"Moonglade Cowl",id:28348,q:Q.rare,src:"Botanica - Freywinn",stats:{agi:8,int:25,spi:13,stam:18,str:24}}
+      ],
+      neck:[
+        {name:"Necklace of Eternal Hope",id:29374,q:Q.rare,src:"Heroic Dungeon Drop",stats:{int:21,mp5:4,stam:22}},
+        {name:"Medallion of the Lightbearer",id:29123,q:Q.rare,src:"Heroic Dungeon Drop",stats:{int:28,mp5:6,stam:18}},
+        {name:"Chain of the Twilight Owl",id:24121,q:Q.rare,src:"Jewelcrafting (BoE)",stats:{def:18,int:19,sp:21}}
+      ],
+      shoulders:[
+        {name:"Hallowed Pauldrons",id:27775,q:Q.rare,src:"Shadow Lab - Vorpil",stats:{int:17,spi:20,stam:10}},
+        {name:"Primal Mooncloth Shoulders",id:21874,q:Q.epic,src:"Tailoring (BoP)",stats:{int:16,mp5:7,spi:15}},
+        {name:"Pauldrons of Sufferance",id:27433,q:Q.rare,src:"Old Hillsbrad - Epoch Hunter",stats:{int:13,spi:19,stam:18}},
+        {name:"Justice Bearer's Pauldrons",id:27539,q:Q.rare,src:"Heroic Ramparts - Omor",stats:{int:25,mp5:7,stam:25}}
+      ],
+      back:[
+        {name:"Light-Touched Stole of Altruism",id:29354,q:Q.epic,src:"Heroic Auchenai - Maladaar",stats:{int:21,stam:22}},
+        {name:"Bishop's Cloak",id:29375,q:Q.epic,src:"Badges of Justice",stats:{int:17,mp5:8,stam:16}},
+        {name:"Avian Cloak of Feathers",id:27946,q:Q.rare,src:"Sethekk Halls - Ikiss",stats:{int:18,mp5:5,spi:12}},
+        {name:"White Remedy Cape",id:24254,q:Q.rare,src:"Tailoring (BoE)",stats:{mp5:7}}
+      ],
+      chest:[
+        {name:"Windhawk Hauberk",id:29522,q:Q.epic,src:"Leatherworking (BoP)",stats:{crit:19,int:29,mp5:8,sp:32,spi:29,stam:28}},
+        {name:"Primal Mooncloth Robe",id:21875,q:Q.epic,src:"Tailoring (BoP)",stats:{int:20,mp5:10,spi:20}},
+        {name:"Hallowed Garments",id:28230,q:Q.rare,src:"Shadow Lab - Murmur",stats:{int:26,spi:26,stam:12}},
+        {name:"Moonglade Robe",id:28202,q:Q.rare,src:"Mechanar - Sepethrea",stats:{agi:17,int:17,spi:14,stam:16,str:25}}
+      ],
+      wrists:[
+        {name:"Windhawk Bracers",id:29523,q:Q.epic,src:"Leatherworking (BoP)",stats:{crit:16,int:17,mp5:8,sp:16,spi:7,stam:22}},
+        {name:"Blessed Bracers",id:23539,q:Q.epic,src:"Blacksmithing",stats:{crit:18,int:14,stam:12}},
+        {name:"Bindings of the Timewalker",id:29183,q:Q.epic,src:"Keepers of Time - Revered",stats:{int:12,stam:24}},
+        {name:"Bands of the Benevolent",id:29249,q:Q.epic,src:"Sethekk Halls - Ikiss",stats:{int:20,spi:18,stam:18}}
+      ],
+      hands:[
+        {name:"Life Bearer's Gauntlets",id:27457,q:Q.rare,src:"Heroic Ramparts - Omor",stats:{crit:18,int:25,stam:23}},
+        {name:"Gloves of the Living Touch",id:29506,q:Q.epic,src:"Leatherworking (BoE)",stats:{int:18,spi:22,stam:16}},
+        {name:"Hallowed Handwraps",id:27536,q:Q.rare,src:"Shattered Halls - Kargath",stats:{int:20,spi:26,stam:19}}
+      ],
+      waist:[
+        {name:"Windhawk Belt",id:29524,q:Q.epic,src:"Leatherworking (BoP)",stats:{crit:12,int:19,mp5:8,sp:23,spi:20,stam:17}},
+        {name:"Primal Mooncloth Belt",id:21873,q:Q.epic,src:"Tailoring (BoP)",stats:{int:12,mp5:8,spi:11}},
+        {name:"Cord of Sanctification",id:29250,q:Q.epic,src:"Old Hillsbrad - Captain Skarloc",stats:{int:24,mp5:7,stam:25}},
+        {name:"Girdle of Many Blessings",id:27548,q:Q.rare,src:"Heroic Slave Pens - Rokmar",stats:{crit:21,int:22,stam:24}}
+      ],
+      legs:[
+        {name:"Pontifex Kilt",id:30543,q:Q.epic,src:"Heroic Steamvault - Kalithresh",stats:{int:29,spi:27,stam:25}},
+        {name:"Whitemend Pants",id:24261,q:Q.epic,src:"Tailoring (Whitemend Set)",stats:{int:21,mp5:11,stam:21}},
+        {name:"Hallowed Trousers",id:27875,q:Q.rare,src:"Sethekk Halls - Ikiss",stats:{int:33,mp5:7,spi:18,stam:25}},
+        {name:"Pants of the Naaru",id:30256,q:Q.rare,src:"Quest Reward",stats:{int:22,spi:25,stam:27}}
+      ],
+      feet:[
+        {name:"Boots of the Pious",id:29251,q:Q.epic,src:"Mechanar - Pathaleon",stats:{int:26,spi:23,stam:24}},
+        {name:"Slippers of Serenity",id:27411,q:Q.rare,src:"Auchenai Crypts - Maladaar",stats:{int:22,spi:15,stam:10}},
+        {name:"Boots of the Watchful Heart",id:28221,q:Q.rare,src:"Old Hillsbrad - Skarloc",stats:{int:26,mp5:7,stam:23}}
+      ],
+      ring1:[
+        {name:"Band of the Exorcist",id:28553,q:Q.epic,src:"Spirit Shard Vendor",stats:{ap:34,crit:16,hit:10,res:11,stam:24}},
+        {name:"Cosmic Lifeband",id:28259,q:Q.rare,src:"Heroic Mechanar",stats:{mp5:7}},
+        {name:"Seer's Signet",id:29126,q:Q.epic,src:"Scryers - Revered",stats:{crit:12,sp:34,stam:24}}
+      ],
+      ring2:[
+        {name:"Ashyen's Gift",id:29172,q:Q.epic,src:"Cenarion Expedition - Exalted",stats:{sp:23,stam:30}},
+        {name:"Ring of Convalescence",id:29169,q:Q.rare,src:"Heroic Dungeon Drop",stats:{int:15,mp5:4}}
+      ],
+      trinket1:[
+        {name:"Essence of the Martyr",id:29376,q:Q.epic,src:"41 Badges of Justice",stats:{hp:297,sp:99}},
+        {name:"Lower City Prayerbook",id:30841,q:Q.rare,src:"Lower City - Revered",stats:{heal:0,mp5:0}},
+        {name:"Bangle of Endless Blessings",id:28370,q:Q.rare,src:"Heroic Dungeon Drop",stats:{heal:0,mp5:0}}
+      ],
+      trinket2:[
+        {name:"Ribbon of Sacrifice",id:28590,q:Q.rare,src:"Heroic Dungeon Drop",stats:{heal:0}},
+        {name:"Oshu'gun Relic",id:25634,q:Q.rare,src:"Heroic Dungeon Drop",stats:{hp:213,sp:71}},
+        {name:"Alchemist's Stone",id:13503,q:Q.epic,src:"Alchemy (BoP)",stats:{agi:15,int:15,spi:15,stam:15,str:15}}
+      ],
+      mainhand:[
+        {name:"The Ancient Scepter of Sue-Min",id:31342,q:Q.epic,src:"Heroic Old Hillsbrad",stats:{int:15,mp5:8}},
+        {name:"Gavel of Unearthed Secrets",id:30832,q:Q.epic,src:"Badges of Justice",stats:{crit:15,int:16,sp:159,stam:24}},
+        {name:"Hammer of the Penitent",id:28257,q:Q.rare,src:"Sha'tar - Revered",stats:{int:16,mp5:6,spi:13}}
+      ],
+      offhand:[
+        {name:"Tears of Heaven",id:29274,q:Q.rare,src:"Quest Reward",stats:{mp5:6}},
+        {name:"Lamp of Peaceful Radiance",id:28412,q:Q.rare,src:"Heroic Mana-Tombs",stats:{crit:13,int:14,sp:21,stam:13}},
+        {name:"Star-Heart Lamp",id:28187,q:Q.rare,src:"Heroic Underbog",stats:{int:18,sp:22,stam:17}}
+      ],
+      libram:[
+        {name:"Libram of Light",id:23006,q:Q.rare,src:"Heroic Dungeon Drop",stats:{heal:0}},
+        {name:"Libram of Divinity",id:23201,q:Q.rare,src:"Heroic Dungeon Drop",stats:{heal:0}}
+      ]
+    }
+  }
+
+};
+
+const PRIORITY_ORDER = {
+  "fire-mage": [
+    "Spellfire Set (Robe + Gloves + Belt) \u2014 Craft these ASAP",
+    "Spellstrike Hood + Pants \u2014 Craft or buy BoE",
+    "Quagmirran's Eye \u2014 Heroic Slave Pens",
+    "Icon of the Silver Crescent \u2014 41 Badges",
+    "Eternium Runed Blade / Stormcaller \u2014 Weapon upgrade",
+    "Girdle of Ruination \u2014 If not Spellfire Belt",
+    "Bracers of Havok \u2014 Tailoring BoE",
+    "Manasurge Pendant \u2014 Badges",
+    "Sigil-Laced Boots \u2014 Arcatraz",
+    "Ashyen's Gift \u2014 CE Exalted ring"
+  ],
+  "arcane-mage": [
+    "Spellfire Set (Robe + Gloves + Belt) \u2014 Craft these ASAP",
+    "Spellstrike Hood + Pants \u2014 Craft or buy BoE",
+    "Icon of the Silver Crescent \u2014 41 Badges",
+    "Quagmirran's Eye \u2014 Heroic Slave Pens",
+    "Eternium Runed Blade / Stormcaller \u2014 Weapon upgrade",
+    "Mana-Binders Cowl \u2014 50 Badges (if not Spellstrike Hood)",
+    "Bracers of Havok \u2014 Tailoring BoE",
+    "Manasurge Pendant \u2014 Badges",
+    "Ashyen's Gift \u2014 CE Exalted ring",
+    "Seer's Signet \u2014 Scryers Revered"
+  ],
+  "ret-paladin": [
+    "Lionheart Champion / Deep Thunder \u2014 BS Weaponsmith",
+    "Bloodlust Brooch \u2014 41 Badges",
+    "Mask of the Deceiver \u2014 50 Badges",
+    "Choker of Vile Intent \u2014 25 Badges",
+    "Ragesteel Breastplate + Shoulders \u2014 BS BoE",
+    "Vengeance Wrap \u2014 Tailoring BoE",
+    "Shapeshifter's Signet \u2014 Lower City Exalted",
+    "Black Felsteel Bracers \u2014 BS BoE",
+    "Hourglass of the Unraveller \u2014 Black Morass",
+    "Girdle of the Deathdealer \u2014 Heroic Black Morass"
+  ],
+  "prot-paladin": [
+    "Crest of the Sha'tar \u2014 Sha'tar Exalted shield",
+    "Faceguard of Determination \u2014 50 Badges",
+    "Farstrider Defender's Cloak \u2014 25 Badges",
+    "Libram of Repentance \u2014 Badges",
+    "Bracers of the Green Fortress \u2014 BS crafted",
+    "Continuum Blade / Gavel \u2014 Weapon with SP",
+    "Helm of the Righteous \u2014 Mechanar",
+    "Breastplate of the Righteous \u2014 Steamvault",
+    "Gauntlets of the Righteous \u2014 Shattered Halls",
+    "Timewarden's Leggings \u2014 KoT Revered"
+  ],
+  "holy-paladin": [
+    "Windhawk Set (Hauberk + Belt + Bracers) OR Primal Mooncloth Set",
+    "Essence of the Martyr \u2014 41 Badges",
+    "Helmet of the Steadfast Champion \u2014 Badges",
+    "The Ancient Scepter of Sue-Min \u2014 Heroic Old Hillsbrad",
+    "Light-Touched Stole of Altruism \u2014 Heroic Auchenai",
+    "Pontifex Kilt \u2014 Heroic Steamvault",
+    "Boots of the Pious \u2014 Mechanar",
+    "Band of the Exorcist \u2014 Spirit Shards",
+    "Lower City Prayerbook \u2014 Lower City Revered",
+    "Cord of Sanctification \u2014 Old Hillsbrad"
+  ]
+};
+
+
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let currentSpec = localStorage.getItem("prebis-spec") || "";
+let currentView = "sheet"; // "sheet" | "routes" | "tracker"
+let sheetMode = "bis"; // "bis" | "mygear"
+
+// ---------------------------------------------------------------------------
+// Profession Filters
+// ---------------------------------------------------------------------------
+const ALL_PROFESSIONS = ["Tailoring","Blacksmithing","Leatherworking","Jewelcrafting","Alchemy","Engineering"];
+
+function loadProfessions() {
+  try {
+    var raw = localStorage.getItem("prebis-professions");
+    return raw ? JSON.parse(raw) : ALL_PROFESSIONS.slice(); // all enabled by default
+  } catch(e) { return ALL_PROFESSIONS.slice(); }
+}
+
+function saveProfessions(profs) {
+  localStorage.setItem("prebis-professions", JSON.stringify(profs));
+}
+
+function toggleProfession(prof) {
+  var profs = loadProfessions();
+  var idx = profs.indexOf(prof);
+  if (idx === -1) profs.push(prof);
+  else profs.splice(idx, 1);
+  saveProfessions(profs);
+  renderCurrentView();
+}
+
+function isItemFilteredByProfession(item) {
+  var profs = loadProfessions();
+  var s = item.src.toLowerCase();
+  for (var i = 0; i < ALL_PROFESSIONS.length; i++) {
+    var p = ALL_PROFESSIONS[i].toLowerCase();
+    if (s.includes(p) && profs.indexOf(ALL_PROFESSIONS[i]) === -1) return true;
+  }
+  return false;
+}
+
+function isItemOwnedInTracker(slotKey, itemId) {
+  var tracked = loadTracker();
+  var spec = specData();
+  if (tracked[slotKey] === undefined || tracked[slotKey] === "") return false;
+  var val = String(tracked[slotKey]);
+  if (val.indexOf("c:") === 0) return false; // custom items don't match BiS items
+  var idx = parseInt(val, 10);
+  var items = spec.slots[slotKey];
+  if (!items || !items[idx]) return false;
+  return items[idx].id === itemId;
+}
+
+// Parse a custom tracker value "c:ITEMID:NAME" → {id, name} or null
+function parseCustomItem(val) {
+  if (!val || String(val).indexOf("c:") !== 0) return null;
+  var rest = String(val).substring(2);
+  var colonIdx = rest.indexOf(":");
+  if (colonIdx === -1) return {id: 0, name: rest};
+  var id = parseInt(rest.substring(0, colonIdx), 10) || 0;
+  var name = rest.substring(colonIdx + 1);
+  return {id: id, name: name};
+}
+
+// ---------------------------------------------------------------------------
+// Custom Item Stats Cache (fetched from Wowhead tooltip API)
+// ---------------------------------------------------------------------------
+var _customStatsCache = {};
+(function() {
+  try { _customStatsCache = JSON.parse(localStorage.getItem("prebis-custom-stats") || "{}"); } catch(e) { _customStatsCache = {}; }
+})();
+function saveCustomStatsCache() {
+  try { localStorage.setItem("prebis-custom-stats", JSON.stringify(_customStatsCache)); } catch(e) {}
+}
+function getCustomItemStats(itemId) {
+  return _customStatsCache[itemId] || null;
+}
+
+// Wowhead stat/rtg ID → our stat key
+var WH_STAT_MAP = {
+  3:'agi', 4:'str', 5:'int', 6:'spi', 7:'stam'
+};
+var WH_RTG_MAP = {
+  12:'def', 13:'dodge', 14:'parry', 15:'block', 21:'crit', 31:'hit', 32:'crit', 35:'res', 37:'exp'
+};
+
+function parseWowheadStats(tooltipHtml) {
+  var stats = {};
+  // Base stats: <!--stat5-->+17
+  var statRe = /<!--stat(\d+)-->\+?(\d+)/g;
+  var m;
+  while ((m = statRe.exec(tooltipHtml)) !== null) {
+    var key = WH_STAT_MAP[m[1]];
+    if (key) stats[key] = (stats[key] || 0) + parseInt(m[2]);
+  }
+  // Rating stats: <!--rtg21-->28
+  var rtgRe = /<!--rtg(\d+)-->(\d+)/g;
+  while ((m = rtgRe.exec(tooltipHtml)) !== null) {
+    var key = WH_RTG_MAP[m[1]];
+    if (key) stats[key] = (stats[key] || 0) + parseInt(m[2]);
+  }
+  // Spell power: "damage and healing done by magical spells and effects by up to X"
+  var spMatch = tooltipHtml.match(/damage and healing[^<]*?by up to (\d+)/i);
+  if (spMatch) stats.sp = (stats.sp || 0) + parseInt(spMatch[1]);
+  // Fire/Arcane/Shadow specific spell power (count as sp)
+  var schoolSp = tooltipHtml.match(/damage done by \w+[^<]*?by up to (\d+)/gi);
+  if (schoolSp && !spMatch) {
+    stats.sp = (stats.sp || 0) + parseInt(schoolSp[0].match(/(\d+)/)[1]);
+  }
+  // Healing power: "healing done by spells and effects by up to X"
+  var healMatch = tooltipHtml.match(/healing done by spells[^<]*?by up to (\d+)/i);
+  if (healMatch) stats.hp = (stats.hp || 0) + parseInt(healMatch[1]);
+  // MP5: "Restores X mana per 5 sec"
+  var mp5Match = tooltipHtml.match(/Restores (\d+) mana per 5 sec/i);
+  if (mp5Match) stats.mp5 = (stats.mp5 || 0) + parseInt(mp5Match[1]);
+  return Object.keys(stats).length > 0 ? stats : null;
+}
+
+function fetchCustomItemStats(itemId, callback) {
+  if (!itemId) { if (callback) callback(null); return; }
+  if (_customStatsCache[itemId]) { if (callback) callback(_customStatsCache[itemId]); return; }
+  fetch('https://nether.wowhead.com/tooltip/item/' + itemId + '?dataEnv=5&locale=0')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var stats = parseWowheadStats(data.tooltip || '');
+      if (stats) {
+        _customStatsCache[itemId] = stats;
+        saveCustomStatsCache();
+      }
+      if (callback) callback(stats);
+    })
+    .catch(function() { if (callback) callback(null); });
+}
+
+// Get display info for a tracked slot — returns {name, id, src, q, stats, isCustom} or null
+function getTrackedItem(slotKey) {
+  var tracked = loadTracker();
+  var spec = specData();
+  var val = tracked[slotKey];
+  if (val === undefined || val === "") return null;
+  var str = String(val);
+  if (str.indexOf("c:") === 0) {
+    var custom = parseCustomItem(str);
+    return custom ? {name: custom.name, id: custom.id, src: "Custom", q: Q.rare, stats: getCustomItemStats(custom.id), isCustom: true} : null;
+  }
+  var idx = parseInt(str, 10);
+  var items = spec.slots[slotKey];
+  if (!items || !items[idx]) return null;
+  var item = items[idx];
+  return {name: item.name, id: item.id, src: item.src, q: item.q, stats: item.stats, isCustom: false};
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function sourceTag(src) {
+  const s = src.toLowerCase();
+  if (s.includes("heroic"))                                                           return '<span class="tag tag-heroic">Heroic</span>';
+  if (s.includes("badge") || s.includes("g'eras"))                                    return '<span class="tag tag-badge">Badges</span>';
+  if (s.includes("honor") || s.includes("pvp") || s.includes("arena") || s.includes("gladiator")) return '<span class="tag tag-pvp">PvP</span>';
+  if (s.includes("tailoring") || s.includes("blacksmithing") || s.includes("leatherworking") ||
+      s.includes("jewelcrafting") || s.includes("engineering") || s.includes("alchemy") || s.includes("craft")) return '<span class="tag tag-craft">Crafted</span>';
+  if (s.includes("quest"))                                                            return '<span class="tag tag-quest">Quest</span>';
+  if (s.includes("exalted") || s.includes("revered") || s.includes("honored") || s.includes("faction") || s.includes("reputation")) return '<span class="tag tag-rep">Rep</span>';
+  if (s.includes("world drop") || s.includes("boe"))                                 return '<span class="tag tag-world">World</span>';
+  if (s.includes("classic") || s.includes("naxx") || s.includes("aq") || s.includes("bwl") || s.includes("molten")) return '<span class="tag tag-classic">Classic</span>';
+  return '<span class="tag tag-dungeon">Dungeon</span>';
+}
+
+function itemLink(item) {
+  return '<a href="https://www.wowhead.com/tbc/item=' + item.id + '" onclick="if(!event.ctrlKey&&!event.metaKey&&event.button===0){event.preventDefault();}">' + item.name + '</a>';
+}
+
+function refreshWowheadLinks() {
+  setTimeout(function () {
+    if (typeof $WowheadPower !== 'undefined') {
+      $WowheadPower.refreshLinks();
+    }
+  }, 100);
+}
+
+// ---------------------------------------------------------------------------
+// Quality helper — maps Q enum to CSS class suffix
+// ---------------------------------------------------------------------------
+function qualityClass(q) {
+  if (q === Q.legendary) return "legendary";
+  if (q === Q.epic)      return "epic";
+  if (q === Q.rare)      return "rare";
+  if (q === Q.uncommon)  return "uncommon";
+  return "rare"; // fallback
+}
+
+// ---------------------------------------------------------------------------
+// Tab / Navigation — Spec Picker
+// ---------------------------------------------------------------------------
+function buildSpecPicker() {
+  var grid = document.getElementById("specPickerGrid");
+  grid.innerHTML = "";
+  var keys = Object.keys(SPECS);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var spec = SPECS[key];
+    var card = document.createElement("div");
+    card.className = "spec-pick-card";
+    card.setAttribute("data-class", spec.class.toLowerCase());
+    card.innerHTML = '<div class="pick-icon">' + spec.icon + '</div>' +
+      '<div class="pick-name">' + spec.spec + '</div>' +
+      '<div class="pick-class">' + spec.class + '</div>';
+    card.onclick = (function(k) { return function() { pickSpec(k); }; })(key);
+    grid.appendChild(card);
+  }
+}
+
+function pickSpec(spec) {
+  currentSpec = spec;
+  localStorage.setItem("prebis-spec", spec);
+  document.getElementById("specPickerOverlay").style.display = "none";
+  showMainUI();
+  renderCurrentView();
+}
+
+function showSpecPicker() {
+  document.getElementById("specPickerOverlay").style.display = "";
+  document.getElementById("headerSpec").innerHTML = "";
+  document.getElementById("viewTabs").style.display = "none";
+  document.querySelectorAll(".view").forEach(function(v) { v.classList.remove("active"); });
+}
+
+function showMainUI() {
+  var spec = SPECS[currentSpec];
+  if (!spec) return;
+  var classColor = spec.class.toLowerCase() === "mage" ? "var(--mage-color)" : "var(--paladin-color)";
+  var hSpec = document.getElementById("headerSpec");
+  hSpec.innerHTML = '<span class="spec-name" style="color:' + classColor + '">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</span>' +
+    '<button class="change-spec-btn" onclick="showSpecPicker()">Change Spec</button>';
+  document.getElementById("viewTabs").style.display = "";
+  // Re-activate current view
+  document.getElementById("sheetView").classList.toggle("active", currentView === "sheet");
+  document.getElementById("routesView").classList.toggle("active", currentView === "routes");
+  document.getElementById("trackerView").classList.toggle("active", currentView === "tracker");
+}
+
+function setSpec(spec) {
+  pickSpec(spec);
+}
+
+function setView(view) {
+  currentView = view;
+  // Toggle active class on view buttons
+  document.querySelectorAll(".view-btn").forEach(function (btn) {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+  // Toggle active class on view containers
+  document.getElementById("sheetView").classList.toggle("active", view === "sheet");
+  document.getElementById("routesView").classList.toggle("active", view === "routes");
+  document.getElementById("trackerView").classList.toggle("active", view === "tracker");
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  switch (currentView) {
+    case "sheet":   renderSheet();   break;
+    case "routes":  renderRoutes();  break;
+    case "tracker": renderTracker(); break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for spec data access
+// ---------------------------------------------------------------------------
+function specData() {
+  return SPECS[currentSpec];
+}
+
+function specSlots() {
+  return specData().slots;
+}
+
+function bisItem(slotKey) {
+  var items = specSlots()[slotKey];
+  return items && items.length ? items[0] : null; // rank 1
+}
+
+// ---------------------------------------------------------------------------
+// Character Sheet (Paperdoll) View
+// ---------------------------------------------------------------------------
+function toggleSlot(el) {
+  var wasOpen = el.classList.contains('open');
+  el.classList.toggle('open');
+  refreshWowheadLinks();
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      var rect = el.getBoundingClientRect();
+      if (!wasOpen && rect.bottom > window.innerHeight) {
+        var overflow = rect.bottom - window.innerHeight;
+        var nudge = Math.min(overflow + 20, 150);
+        window.scrollTo({ top: window.scrollY + nudge, behavior: 'smooth' });
+      } else if (wasOpen && rect.top < 0) {
+        var nudge = Math.min(Math.abs(rect.top) + 20, 150);
+        window.scrollTo({ top: window.scrollY - nudge, behavior: 'smooth' });
+      }
+    });
+  });
+}
+
+function renderGearSlot(slotKey) {
+  var items = specSlots()[slotKey];
+  if (!items || !items.length) return "";
+  var top = items[0];
+  var label = SLOT_LABELS[slotKey] || slotKey;
+  var qc = qualityClass(top.q);
+  var count = items.length;
+
+  var html = '<div class="gear-slot quality-' + qc + '" onclick="toggleSlot(this)">';
+  html += '<div class="slot-header">';
+  html += '<div class="slot-bis">';
+  html += '<div class="slot-label">' + label + '</div>';
+  html += '<div class="item-link">' + itemLink(top) + '</div>';
+  html += '<div class="item-src">' + top.src + ' ' + sourceTag(top.src) + '</div>';
+  html += '</div>';
+  if (count > 1) html += '<div class="slot-expand">' + count + ' &#9660;</div>';
+  html += '</div>';
+
+  if (count > 1) {
+    html += '<div class="slot-alts">';
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+      html += '<div class="alt-item">';
+      html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
+      html += '<div class="alt-info">';
+      html += '<div class="alt-name">' + itemLink(it) + '</div>';
+      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function computeBisStats() {
+  var spec = specData();
+  var stats = {};
+  var slotKeys = Object.keys(spec.slots);
+  // Avoid double-counting weapons: prefer mainhand+offhand over twohand
+  var hasMainhand = !!spec.slots["mainhand"];
+  var hasTwohand = !!spec.slots["twohand"];
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    if (sk === "twohand" && hasMainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && hasTwohand && !hasMainhand) continue;
+    var item = bisItem(sk);
+    if (!item || !item.stats) continue;
+    var skeys = Object.keys(item.stats);
+    for (var j = 0; j < skeys.length; j++) {
+      stats[skeys[j]] = (stats[skeys[j]] || 0) + item.stats[skeys[j]];
+    }
+  }
+  return stats;
+}
+
+var STAT_NAMES = {sp:"Spell Power",hit:"Hit Rating",crit:"Crit Rating",int:"Intellect",stam:"Stamina",haste:"Haste",str:"Strength",ap:"Attack Power",agi:"Agility",exp:"Expertise",def:"Defense",dodge:"Dodge",block:"Block Rating",bv:"Block Value",heal:"+Healing",mp5:"MP5",spi:"Spirit",parry:"Parry"};
+
+function renderStatSummary(stats) {
+  var spec = specData();
+  var html = '<div class="stat-summary">';
+  var statKeys = Object.keys(stats).filter(function(k) { return stats[k] > 0; });
+  if (!statKeys.length) return '<div class="stat-summary"><div style="font-size:0.8rem;color:var(--text-dim)">No stat data</div></div>';
+
+  // Sort: put hit and defense (cap-based stats) last
+  statKeys.sort(function (a, b) {
+    if (a === "hit" || a === "def") return 1;
+    if (b === "hit" || b === "def") return -1;
+    return (stats[b] || 0) - (stats[a] || 0);
+  });
+
+  for (var i = 0; i < statKeys.length; i++) {
+    var key = statKeys[i];
+    var val = stats[key];
+    var pct;
+    var extra = "";
+
+    if (key === "hit" && spec.hitCap) {
+      pct = Math.min(100, Math.round((val / spec.hitCap) * 100));
+      extra = " / " + spec.hitCap + " cap";
+    } else if (key === "def" && spec.defCap) {
+      pct = Math.min(100, Math.round((val / spec.defCap) * 100));
+      extra = " / " + spec.defCap + " cap";
+    } else {
+      // Generic bar: scale relative to the largest stat value
+      var maxVal = 0;
+      for (var k = 0; k < statKeys.length; k++) {
+        if (statKeys[k] !== "hit" && statKeys[k] !== "def") {
+          maxVal = Math.max(maxVal, stats[statKeys[k]]);
+        }
+      }
+      pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+    }
+
+    var niceName = STAT_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1);
+    var fillClass = 'stat-fill';
+    if ((key === 'hit' || key === 'def') && pct >= 100) fillClass += ' cap-full';
+    else if ((key === 'hit' || key === 'def') && pct >= 70) fillClass += ' cap-hit';
+    html += '<div class="stat-row">' +
+      '<div class="stat-label"><span>' + niceName + '</span><span class="stat-value">' + val + extra + '</span></div>' +
+      '<div class="stat-bar"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div>' +
+    '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function setSheetMode(mode) {
+  sheetMode = mode;
+  renderSheet();
+}
+
+function renderMyGearSlot(slotKey) {
+  var spec = specData();
+  var items = spec.slots[slotKey];
+  if (!items || !items.length) return "";
+  var label = SLOT_LABELS[slotKey] || slotKey;
+  var trackedItem = getTrackedItem(slotKey);
+  var hasItem = !!trackedItem;
+  var qc = hasItem ? qualityClass(trackedItem.q) : "none";
+
+  var html = '<div class="gear-slot mygear-slot quality-' + qc + '" onclick="toggleSlot(this)">';
+  html += '<div class="slot-header">';
+  html += '<div class="slot-bis">';
+  html += '<div class="slot-label">' + label + '</div>';
+  if (hasItem) {
+    if (trackedItem.id) {
+      html += '<div class="item-link">' + itemLink(trackedItem) + '</div>';
+    } else {
+      html += '<div class="item-link">' + trackedItem.name + '</div>';
+    }
+    html += '<div class="item-src">' + trackedItem.src + (trackedItem.isCustom ? '' : ' ' + sourceTag(trackedItem.src)) + '</div>';
+  } else {
+    html += '<div class="mygear-empty"><span class="needed-badge">Empty — Needed</span></div>';
+  }
+  html += '</div>';
+
+  // For custom items, all BiS items are upgrades. For BiS items, items ranked higher are upgrades.
+  var upgradeCount = items.length; // default: all items are upgrades
+  if (hasItem && !trackedItem.isCustom) {
+    var tracked = loadTracker();
+    var curIdx = parseInt(tracked[slotKey], 10);
+    upgradeCount = curIdx; // items before current index are upgrades
+  }
+  if (upgradeCount > 0) html += '<div class="slot-expand">' + upgradeCount + ' &#9660;</div>';
+  html += '</div>';
+
+  // Show upgrade options in dropdown
+  if (upgradeCount > 0) {
+    html += '<div class="slot-alts">';
+    var limit = (hasItem && !trackedItem.isCustom) ? parseInt(loadTracker()[slotKey], 10) : items.length;
+    for (var i = 0; i < limit; i++) {
+      var it = items[i];
+      var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+      html += '<div class="alt-item">';
+      html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
+      html += '<div class="alt-info">';
+      html += '<div class="alt-name">' + itemLink(it) + '</div>';
+      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderStatComparison(bisStats, myStats) {
+  var allKeys = {};
+  Object.keys(bisStats).forEach(function(k) { allKeys[k] = true; });
+  Object.keys(myStats).forEach(function(k) { allKeys[k] = true; });
+  var keys = Object.keys(allKeys).filter(function(k) { return (bisStats[k] || 0) > 0 || (myStats[k] || 0) > 0; });
+  keys.sort(function(a, b) { return (bisStats[b] || 0) - (bisStats[a] || 0); });
+
+  var html = '<div>';
+  html += '<div style="font-size:0.72rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">BiS vs Your Gear</div>';
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var bv = bisStats[k] || 0;
+    var mv = myStats[k] || 0;
+    if (bv === 0 && mv === 0) continue;
+    var niceName = STAT_NAMES[k] || k.charAt(0).toUpperCase() + k.slice(1);
+    html += '<div class="stat-compare">';
+    html += '<span>' + niceName + '</span>';
+    html += '<span><span class="bis-val">' + bv + '</span> &rarr; <span class="my-val' + (mv < bv ? ' lower' : '') + '">' + mv + '</span></span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSheet() {
+  var spec = specData();
+  var bis = spec.slots;
+  var classColor = spec.class.toLowerCase() === "mage" ? "var(--mage-color)" : "var(--paladin-color)";
+
+  // Toggle switch
+  var toggleHtml = '<div class="sheet-toggle">';
+  toggleHtml += '<button class="sheet-toggle-btn' + (sheetMode === "bis" ? " active" : "") + '" onclick="setSheetMode(\'bis\')">BiS List</button>';
+  toggleHtml += '<button class="sheet-toggle-btn' + (sheetMode === "mygear" ? " active" : "") + '" onclick="setSheetMode(\'mygear\')">My Gear</button>';
+  toggleHtml += '</div>';
+
+  // Determine which left/right/weapon slots exist for this spec
+  var leftSlots = LEFT_SLOTS.filter(function (s) { return !!bis[s]; });
+  var rightSlots = RIGHT_SLOTS.filter(function (s) { return !!bis[s]; });
+  var weaponMH = WEAPON_SLOTS_MH.filter(function (s) { return !!bis[s]; });
+  var weaponBottom = WEAPON_SLOTS_BOTTOM.filter(function (s) { return !!bis[s]; });
+
+  var renderSlotFn = sheetMode === "mygear" ? renderMyGearSlot : renderGearSlot;
+
+  // Build columns
+  var leftHtml = '<div class="slot-column">';
+  for (var i = 0; i < leftSlots.length; i++) leftHtml += renderSlotFn(leftSlots[i]);
+  leftHtml += '</div>';
+
+  var rightHtml = '<div class="slot-column">';
+  for (var i = 0; i < rightSlots.length; i++) rightHtml += renderSlotFn(rightSlots[i]);
+  rightHtml += '</div>';
+
+  // Center panel: toggle + stats + weapons in middle
+  var bisStats = computeBisStats();
+  var centerHtml = '<div class="center-column">';
+  centerHtml += toggleHtml;
+
+  if (sheetMode === "mygear") {
+    var myStats = getTrackerStats();
+    centerHtml += '<div class="stats-row">';
+    centerHtml += '<div class="character-model compact">' +
+      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
+      renderStatSummary(myStats) +
+      '</div>';
+    centerHtml += '<div class="character-model compact">' +
+      renderStatComparison(bisStats, myStats) +
+      '</div>';
+    centerHtml += '</div>';
+  } else {
+    centerHtml += '<div class="character-model compact">' +
+      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
+      (spec.notes ? '<div class="spec-notes">' + spec.notes + '</div>' : '') +
+      renderStatSummary(bisStats) +
+      '</div>';
+  }
+
+  // Weapons in center column — MH/OH side by side
+  if (weaponMH.length) {
+    centerHtml += '<div class="weapon-mid">';
+    for (var i = 0; i < weaponMH.length; i++) centerHtml += renderSlotFn(weaponMH[i]);
+    centerHtml += '</div>';
+  }
+
+  // 2H / wand / libram below weapons
+  if (weaponBottom.length) {
+    centerHtml += '<div class="weapon-bottom">';
+    for (var i = 0; i < weaponBottom.length; i++) centerHtml += renderSlotFn(weaponBottom[i]);
+    centerHtml += '</div>';
+  }
+
+  centerHtml += '</div>';
+
+  document.getElementById("sheetView").innerHTML =
+    '<div class="paperdoll-container">' + leftHtml + centerHtml + rightHtml + '</div>';
+
+  refreshWowheadLinks();
+}
+
+// ---------------------------------------------------------------------------
+// Gearing Routes View
+// ---------------------------------------------------------------------------
+function parseDungeonGroup(src) {
+  var s = src.toLowerCase();
+
+  // Crafted
+  var professions = ["tailoring", "blacksmithing", "leatherworking", "jewelcrafting", "engineering", "alchemy"];
+  for (var i = 0; i < professions.length; i++) {
+    if (s.includes(professions[i])) return professions[i].charAt(0).toUpperCase() + professions[i].slice(1);
+  }
+  if (s.includes("craft")) return "Crafted";
+
+  // Badges
+  if (s.includes("badge") || s.includes("g'eras")) return "Badges of Justice";
+
+  // PvP
+  if (s.includes("honor") || s.includes("pvp") || s.includes("arena") || s.includes("gladiator")) return "PvP Rewards";
+
+  // Quest
+  if (s.includes("quest")) return "Quest Rewards";
+
+  // Reputation
+  if (s.includes("exalted") || s.includes("revered") || s.includes("honored") || s.includes("faction") || s.includes("reputation")) {
+    // Try to extract faction name
+    // Format is often "Revered - Faction Name" or "Faction (Exalted)"
+    var dashIdx = src.indexOf(" - ");
+    if (dashIdx !== -1) return src.substring(dashIdx + 3).trim();
+    var parenIdx = src.indexOf("(");
+    if (parenIdx !== -1) return src.substring(0, parenIdx).trim();
+    return src; // return as-is
+  }
+
+  // World
+  if (s.includes("world drop") || s.includes("boe")) return "World Drops / BoE";
+
+  // Classic
+  if (s.includes("classic") || s.includes("naxx") || s.includes("aq") || s.includes("bwl") || s.includes("molten")) return "Classic Raids";
+
+  // Default: use source as dungeon name (clean up a bit)
+  // Strip boss names after " - " to group by dungeon
+  var dash = src.indexOf(" - ");
+  if (dash !== -1) return src.substring(0, dash).trim();
+  return src.trim() || "Unknown";
+}
+
+function sourceTypeKey(src) {
+  var s = src.toLowerCase();
+  if (s.includes("heroic")) return "heroic";
+  if (s.includes("badge") || s.includes("g'eras")) return "badge";
+  if (s.includes("honor") || s.includes("pvp") || s.includes("arena")) return "pvp";
+  if (s.includes("tailoring") || s.includes("blacksmithing") || s.includes("leatherworking") ||
+      s.includes("jewelcrafting") || s.includes("engineering") || s.includes("alchemy") || s.includes("craft")) return "craft";
+  if (s.includes("quest")) return "quest";
+  if (s.includes("exalted") || s.includes("revered") || s.includes("honored")) return "rep";
+  if (s.includes("world drop") || s.includes("boe")) return "world";
+  if (s.includes("classic") || s.includes("naxx") || s.includes("aq") || s.includes("bwl") || s.includes("molten")) return "classic";
+  return "dungeon";
+}
+
+function sourceEmoji(type) {
+  switch(type) {
+    case "heroic": return "\u2694\uFE0F";
+    case "badge": return "\uD83E\uDE99";
+    case "craft": return "\uD83D\uDD28";
+    case "rep": return "\uD83D\uDCDC";
+    case "classic": return "\uD83D\uDC80";
+    case "quest": return "\u2757";
+    case "pvp": return "\uD83C\uDFF4";
+    case "world": return "\uD83C\uDF0D";
+    default: return "\uD83D\uDDE1\uFE0F";
+  }
+}
+
+// Source category definitions
+var SOURCE_CATEGORIES = [
+  {key:'dungeon', label:'Dungeons', icon:'\uD83D\uDDE1\uFE0F'},
+  {key:'heroic',  label:'Heroic Dungeons', icon:'\u2694\uFE0F'},
+  {key:'craft',   label:'Crafting', icon:'\uD83D\uDD28'},
+  {key:'rep',     label:'Reputation', icon:'\uD83D\uDCDC'},
+  {key:'_other',  label:'Other', icon:'\u2B50'}
+];
+// Keys that get lumped into "Other"
+var OTHER_KEYS = ['badge','classic','quest','world','pvp'];
+
+// Find the first matching item from spec data for a priority text string
+function findPrioItemId(prioText, spec) {
+  var slotKeys = Object.keys(spec.slots);
+  // Exact name match first
+  for (var i = 0; i < slotKeys.length; i++) {
+    var items = spec.slots[slotKeys[i]];
+    for (var j = 0; j < items.length; j++) {
+      if (prioText.includes(items[j].name)) return items[j].id;
+    }
+  }
+  // Fuzzy: check if item name's first two words (e.g. "Spellfire Robe") match
+  // where the set name appears (e.g. "Spellfire Set")
+  var prioLower = prioText.toLowerCase();
+  for (var i = 0; i < slotKeys.length; i++) {
+    var items = spec.slots[slotKeys[i]];
+    for (var j = 0; j < items.length; j++) {
+      var words = items[j].name.split(" ");
+      if (words.length >= 2 && prioLower.includes(words[0].toLowerCase()) && items[j].q >= 3) {
+        return items[j].id;
+      }
+    }
+  }
+  return 0;
+}
+
+// Wowhead medium icon URL by item ID (loaded via their CDN)
+function wowheadIconUrl(itemId) {
+  return 'https://wow.zamimg.com/images/wow/icons/medium/' + itemId + '.jpg';
+}
+
+// Routes: cached groups for detail panel rendering
+var _routeGroups = {};
+var _routeGroupNames = [];
+var _activeSource = null;
+
+function toggleCategory(el) {
+  el.closest('.source-category').classList.toggle('cat-open');
+}
+
+function selectSource(name) {
+  _activeSource = name;
+  document.querySelectorAll('.source-row').forEach(function(r) {
+    r.classList.toggle('source-active', r.getAttribute('data-source-name') === name);
+  });
+  // Also expand the parent category
+  var activeRow = document.querySelector('.source-row.source-active');
+  if (activeRow) {
+    var cat = activeRow.closest('.source-category');
+    if (cat && !cat.classList.contains('cat-open')) cat.classList.add('cat-open');
+  }
+  renderDetailPanel();
+}
+
+function renderDetailPanel() {
+  var panel = document.getElementById('route-detail-panel');
+  if (!panel) return;
+  if (!_activeSource || !_routeGroups[_activeSource]) {
+    panel.innerHTML = '<div class="detail-panel-empty">Select a source to see its items</div>';
+    return;
+  }
+  var grp = _routeGroups[_activeSource];
+  var type = grp.type;
+  var ownedPct = grp.total > 0 ? Math.round(((grp.total - grp.remaining) / grp.total) * 100) : 0;
+  var barColors = {heroic:'#8844cc',badge:'#c8aa6e',craft:'#cc7722',rep:'#33aa33',classic:'#8b6633',dungeon:'#2266bb',quest:'#aaaa33',pvp:'#cc3333',world:'#7744aa'};
+  var barColor = barColors[type] || '#555';
+
+  var html = '<div class="detail-panel-header">';
+  html += '<div class="detail-title"><span>' + sourceEmoji(type) + '</span> ' + _activeSource + '</div>';
+  html += '<div class="detail-count">' + (grp.remaining === 0 ? '<strong>\u2713 All owned</strong>' : '<strong>' + (grp.total - grp.remaining) + '</strong> / ' + grp.total + ' owned \u2014 ' + grp.remaining + ' remaining') + '</div>';
+  html += '<div class="detail-bar"><div class="detail-bar-fill" style="width:' + ownedPct + '%;background:' + barColor + ';"></div></div>';
+  html += '</div>';
+
+  html += '<div class="detail-panel-body">';
+  html += '<ul class="item-list">';
+  for (var e = 0; e < grp.entries.length; e++) {
+    var entry = grp.entries[e];
+    var label = SLOT_LABELS[entry.slotKey] || entry.slotKey;
+    var owned = isItemOwnedInTracker(entry.slotKey, entry.item.id);
+    html += '<li' + (owned ? ' class="owned-strike"' : '') + '>';
+    html += '<span class="slot-tag">' + label + '</span>';
+    html += itemLink(entry.item);
+    html += '<span class="owned-indicator ' + (owned ? 'is-owned' : 'is-needed') + '">' + (owned ? '\u2713 Owned' : 'Need') + '</span>';
+    html += '</li>';
+  }
+  html += '</ul></div>';
+
+  panel.innerHTML = html;
+  refreshWowheadLinks();
+}
+
+function filterRouteSources() {
+  var input = document.getElementById('routes-search');
+  if (!input) return;
+  var q = input.value.toLowerCase().trim();
+  var firstVisible = null;
+
+  document.querySelectorAll('.source-category').forEach(function(cat) {
+    var rows = cat.querySelectorAll('.source-row');
+    var anyVisible = false;
+    rows.forEach(function(row) {
+      var name = row.getAttribute('data-source-name') || '';
+      var items = row.getAttribute('data-item-names') || '';
+      var match = !q || name.toLowerCase().includes(q) || items.toLowerCase().includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) { anyVisible = true; if (!firstVisible) firstVisible = name; }
+    });
+    // Hide entire category if no children match; expand if searching
+    cat.style.display = anyVisible ? '' : 'none';
+    if (q && anyVisible) cat.classList.add('cat-open');
+    else if (!q) cat.classList.remove('cat-open');
+  });
+  if (q && firstVisible) selectSource(firstVisible);
+}
+
+function renderRoutes() {
+  var spec = specData();
+  var tracked = loadTracker();
+  var html = '<div class="routes-container">';
+
+  html += '<div class="routes-two-col">';
+
+  // ====== LEFT COLUMN: Priority Upgrades ======
+  html += '<div class="priority-sidebar">';
+  var prio = PRIORITY_ORDER[currentSpec];
+  if (prio && prio.length) {
+    var ownedCount = 0;
+    var prioItems = [];
+    for (var i = 0; i < prio.length; i++) {
+      var owned = false;
+      var slotKeys = Object.keys(spec.slots);
+      for (var sk = 0; sk < slotKeys.length; sk++) {
+        var tval = tracked[slotKeys[sk]];
+        if (tval === undefined || tval === "") continue;
+        var tStr = String(tval);
+        if (tStr.indexOf("c:") === 0) {
+          var custom = parseCustomItem(tStr);
+          if (custom && prio[i].includes(custom.name)) { owned = true; break; }
+        } else {
+          var idx = parseInt(tStr, 10);
+          var items = spec.slots[slotKeys[sk]];
+          if (items && items[idx] && prio[i].includes(items[idx].name)) { owned = true; break; }
+        }
+      }
+      if (owned) ownedCount++;
+      prioItems.push({text: prio[i], owned: owned});
+    }
+
+    html += '<div class="routes-section-title">Priority Upgrades</div>';
+    html += '<div class="prio-ring-wrap">';
+    html += '<div class="prio-ring">';
+
+    // SVG background ring track + progress arc
+    var total = prio.length;
+    var pctDone = total > 0 ? (ownedCount / total) : 0;
+    var radius = 126;
+    var cx = 150, cy = 150;
+    var circumference = 2 * Math.PI * radius;
+    var dashOffset = circumference * (1 - pctDone);
+    html += '<svg viewBox="0 0 300 300">';
+    html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + radius + '" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="3"/>';
+    html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + radius + '" fill="none" stroke="var(--uncommon)" stroke-width="3" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + dashOffset + '" stroke-linecap="round" transform="rotate(-90 ' + cx + ' ' + cy + ')" opacity="0.4"/>';
+    html += '</svg>';
+
+    // Center label
+    html += '<div class="prio-ring-center">';
+    html += '<div class="ring-count">' + ownedCount + '/' + total + '</div>';
+    html += '<div class="ring-label">acquired</div>';
+    html += '</div>';
+
+    // Position chips in a circle with item icons
+    for (var i = 0; i < prioItems.length; i++) {
+      var pi = prioItems[i];
+      var parts = pi.text.split(" \u2014 ");
+      var itemName = parts[0] || pi.text;
+      var itemMeta = parts[1] || "";
+      var itemId = findPrioItemId(pi.text, spec);
+      var angle = ((i / total) * 360) - 90; // start from top
+      var rad = angle * (Math.PI / 180);
+      var chipX = cx + radius * Math.cos(rad);
+      var chipY = cy + radius * Math.sin(rad);
+      html += '<div class="prio-chip' + (pi.owned ? ' prio-owned' : '') + '" style="left:' + chipX + 'px;top:' + chipY + 'px;transform:translate(-50%,-50%)">';
+      if (itemId) {
+        html += '<a href="https://www.wowhead.com/tbc/item=' + itemId + '" class="prio-icon-link" data-wh-icon-size="large">' + itemName + '</a>';
+      }
+      html += '<div class="prio-num">' + (i + 1) + '</div>';
+      html += '<div class="prio-tooltip">';
+      html += '<div>' + itemName + (pi.owned ? ' \u2713' : '') + '</div>';
+      if (itemMeta) html += '<div class="tt-meta">' + itemMeta + '</div>';
+      html += '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>'; // end prio-ring
+
+    // Legend list below ring
+    html += '<ol class="prio-legend">';
+    for (var i = 0; i < prioItems.length; i++) {
+      var pi = prioItems[i];
+      var parts = pi.text.split(" \u2014 ");
+      var itemName = parts[0] || pi.text;
+      var itemMeta = parts[1] || "";
+      html += '<li class="prio-legend-item' + (pi.owned ? ' prio-legend-owned' : '') + '">';
+      html += '<span class="prio-legend-name">' + itemName + '</span>';
+      if (itemMeta) html += '<span class="prio-legend-meta"> — ' + itemMeta + '</span>';
+      if (pi.owned) html += '<span class="prio-legend-check"> \u2713</span>';
+      html += '</li>';
+    }
+    html += '</ol>';
+
+    html += '</div>'; // end prio-ring-wrap
+  }
+  html += '</div>'; // end priority-sidebar
+
+  // ====== RIGHT COLUMN: Source list + Detail panel ======
+  html += '<div>';
+  html += '<div class="routes-section-title">Items By Source</div>';
+  html += '<input type="text" class="routes-search" id="routes-search" placeholder="Search sources or items..." oninput="filterRouteSources()">';
+
+  // Build groups
+  _routeGroups = {};
+  var slotKeys = Object.keys(spec.slots);
+  for (var i = 0; i < slotKeys.length; i++) {
+    var items = spec.slots[slotKeys[i]];
+    for (var j = 0; j < items.length; j++) {
+      var item = items[j];
+      if (isItemFilteredByProfession(item)) continue;
+      var group = parseDungeonGroup(item.src);
+      if (!_routeGroups[group]) _routeGroups[group] = { entries:[], type: sourceTypeKey(item.src) };
+      _routeGroups[group].entries.push({ item: item, slotKey: slotKeys[i] });
+    }
+  }
+
+  _routeGroupNames = Object.keys(_routeGroups);
+  for (var g = 0; g < _routeGroupNames.length; g++) {
+    var grp = _routeGroups[_routeGroupNames[g]];
+    grp.remaining = 0;
+    grp.total = grp.entries.length;
+    for (var e = 0; e < grp.entries.length; e++) {
+      if (!isItemOwnedInTracker(grp.entries[e].slotKey, grp.entries[e].item.id)) grp.remaining++;
+    }
+  }
+  _routeGroupNames.sort(function(a, b) { return _routeGroups[b].remaining - _routeGroups[a].remaining; });
+
+  html += '<div class="source-list-detail">';
+
+  // Source list (left) — grouped by category
+  html += '<div class="source-list-col">';
+
+  // Build category → sources mapping
+  var catGroups = {}; // catKey → [{name, grp}]
+  for (var g = 0; g < _routeGroupNames.length; g++) {
+    var name = _routeGroupNames[g];
+    var grp = _routeGroups[name];
+    var catKey = OTHER_KEYS.indexOf(grp.type) !== -1 ? '_other' : grp.type;
+    if (!catGroups[catKey]) catGroups[catKey] = [];
+    catGroups[catKey].push({name: name, grp: grp});
+  }
+
+  // Sort sources within each category by remaining (most needed first)
+  for (var ck in catGroups) {
+    catGroups[ck].sort(function(a, b) { return b.grp.remaining - a.grp.remaining; });
+  }
+
+  var firstSource = null;
+  for (var c = 0; c < SOURCE_CATEGORIES.length; c++) {
+    var cat = SOURCE_CATEGORIES[c];
+    var sources = catGroups[cat.key];
+    if (!sources || !sources.length) continue;
+
+    // Aggregate category totals
+    var catTotal = 0, catOwned = 0;
+    for (var s = 0; s < sources.length; s++) {
+      catTotal += sources[s].grp.total;
+      catOwned += sources[s].grp.total - sources[s].grp.remaining;
+    }
+    var catPct = catTotal > 0 ? Math.round((catOwned / catTotal) * 100) : 0;
+
+    html += '<div class="source-category cat-' + cat.key + '">';
+    html += '<div class="source-cat-header" onclick="toggleCategory(this)">';
+    html += '<span class="cat-icon">' + cat.icon + '</span>';
+    html += '<span class="cat-label">' + cat.label + '</span>';
+    html += '<span class="cat-count"><strong>' + catOwned + '</strong>/' + catTotal + '</span>';
+    html += '<div class="cat-bar"><div class="cat-bar-fill" style="width:' + catPct + '%"></div></div>';
+    html += '<span class="cat-arrow">&#9660;</span>';
+    html += '</div>';
+    html += '<div class="source-cat-children">';
+    for (var s = 0; s < sources.length; s++) {
+      var src = sources[s];
+      var isComplete = src.grp.remaining === 0;
+      var itemNames = src.grp.entries.map(function(e) { return e.item.name; }).join(',');
+      if (!firstSource) firstSource = src.name;
+      html += '<div class="source-row' + (isComplete ? ' source-complete' : '') + '" data-source-name="' + src.name.replace(/"/g,'&quot;') + '" data-item-names="' + itemNames.replace(/"/g,'&quot;') + '" onclick="selectSource(\'' + src.name.replace(/'/g,"\\'") + '\')">';
+      html += '<span class="source-name">' + src.name + '</span>';
+      html += '<span class="source-count">' + (isComplete ? '\u2713' : '<strong>' + (src.grp.total - src.grp.remaining) + '</strong>/' + src.grp.total) + '</span>';
+      html += '</div>';
+    }
+    html += '</div></div>'; // end children + category
+  }
+
+  html += '</div>'; // end source-list-col
+
+  // Detail panel (right, sticky)
+  html += '<div class="detail-panel" id="route-detail-panel"></div>';
+
+  html += '</div>'; // end source-list-detail
+  html += '</div>'; // end right column
+  html += '</div>'; // end routes-two-col
+  html += '</div>'; // end routes-container
+  document.getElementById("routesView").innerHTML = html;
+
+  // All collapsed, nothing selected by default
+  _activeSource = null;
+  renderDetailPanel();
+  refreshWowheadLinks();
+}
+
+// ---------------------------------------------------------------------------
+// Gear Tracker View
+// ---------------------------------------------------------------------------
+function trackerKey() {
+  return "prebis-tracker-" + currentSpec;
+}
+
+function loadTracker() {
+  try {
+    var raw = localStorage.getItem(trackerKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveTracker(data) {
+  localStorage.setItem(trackerKey(), JSON.stringify(data));
+}
+
+function trackItem(slot, index) {
+  var data = loadTracker();
+  if (index === "" || index === null || index === undefined) {
+    delete data[slot];
+  } else {
+    data[slot] = index;
+  }
+  saveTracker(data);
+  renderTracker();
+  // Cross-tab: if routes or sheet are visible, they'll pick up changes on next render
+  // Dispatch a custom event for any listeners
+  window.dispatchEvent(new CustomEvent('tracker-changed'));
+}
+
+function resetTracker() {
+  if (confirm("Reset all tracked gear for this spec?")) {
+    localStorage.removeItem(trackerKey());
+    renderTracker();
+  }
+}
+
+function getTrackerStats() {
+  var spec = specData();
+  var tracked = loadTracker();
+  var stats = {};
+  // Determine which weapon setup is active to avoid double-counting
+  var hasTrackedMainhand = tracked["mainhand"] !== undefined && tracked["mainhand"] !== "";
+  var hasTrackedTwohand = tracked["twohand"] !== undefined && tracked["twohand"] !== "";
+  var slotKeys = Object.keys(tracked);
+  for (var i = 0; i < slotKeys.length; i++) {
+    var slot = slotKeys[i];
+    // Skip twohand if mainhand is tracked (prefer MH+OH)
+    if (slot === "twohand" && hasTrackedMainhand) continue;
+    // Skip mainhand/offhand if twohand is tracked but mainhand is not
+    if ((slot === "mainhand" || slot === "offhand") && hasTrackedTwohand && !hasTrackedMainhand) continue;
+    var val = tracked[slot];
+    if (val === undefined || val === "") continue;
+    var itemStats = null;
+    if (String(val).indexOf("c:") === 0) {
+      var custom = parseCustomItem(String(val));
+      if (custom && custom.id) itemStats = getCustomItemStats(custom.id);
+    } else {
+      var idx = parseInt(val, 10);
+      if (isNaN(idx)) continue;
+      var items = spec.slots[slot];
+      if (items && items[idx]) itemStats = items[idx].stats;
+    }
+    if (!itemStats) continue;
+    var skeys = Object.keys(itemStats);
+    for (var j = 0; j < skeys.length; j++) {
+      stats[skeys[j]] = (stats[skeys[j]] || 0) + itemStats[skeys[j]];
+    }
+  }
+  return stats;
+}
+
+function renderTrackerStats(stats) {
+  var keys = Object.keys(stats);
+  if (!keys.length) return '<div style="font-size:0.85rem;color:var(--text-dim);text-align:center;padding:8px 0;">No items selected yet.</div>';
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;padding:8px 0;">';
+  for (var i = 0; i < keys.length; i++) {
+    var niceName = keys[i].charAt(0).toUpperCase() + keys[i].slice(1).replace(/([A-Z])/g, ' $1');
+    html += '<span style="font-size:0.82rem;color:var(--text-dim);">' + niceName + ': <strong style="color:var(--text-gold);">' + stats[keys[i]] + '</strong></span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// Typeahead state
+var activeTypeahead = null; // {slot, highlightIdx}
+
+function openTypeahead(slot) {
+  // Close any other open typeaheads first
+  document.querySelectorAll('.typeahead-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+  var input = document.getElementById('ta-input-' + slot);
+  if (input) input.select(); // Select all text so user can immediately type over
+  var dd = document.getElementById('ta-dd-' + slot);
+  if (dd) { dd.classList.add('open'); filterTypeahead(slot); }
+  activeTypeahead = { slot: slot, highlightIdx: -1 };
+}
+
+function closeTypeahead(slot) {
+  var dd = document.getElementById('ta-dd-' + slot);
+  if (dd) dd.classList.remove('open');
+  // Restore display name if user didn't select anything
+  var input = document.getElementById('ta-input-' + slot);
+  if (input) {
+    var item = getTrackedItem(slot);
+    input.value = item ? item.name : '';
+  }
+  activeTypeahead = null;
+}
+
+var _whSearchTimer = null;
+var _whSearchCache = {};
+var _whSearchSlot = null;
+
+function filterTypeahead(slot) {
+  var input = document.getElementById('ta-input-' + slot);
+  var dd = document.getElementById('ta-dd-' + slot);
+  if (!input || !dd) return;
+  var query = input.value.toLowerCase().trim();
+
+  // Render BiS items immediately
+  renderTypeaheadOptions(slot, query, []);
+
+  // Debounced Wowhead search for non-BiS items
+  if (_whSearchTimer) clearTimeout(_whSearchTimer);
+  _whSearchSlot = slot;
+  if (query.length >= 4) {
+    _whSearchTimer = setTimeout(function() { searchWowhead(slot, query); }, 600);
+  }
+}
+
+function renderTypeaheadOptions(slot, query, whResults) {
+  var dd = document.getElementById('ta-dd-' + slot);
+  if (!dd) return;
+  var spec = specData();
+  var items = spec.slots[slot] || [];
+  var html = '';
+  var bisIds = {};
+
+  // Always show "Not obtained" option
+  html += '<div class="typeahead-option" data-idx="" data-type="clear" onmousedown="selectTypeahead(\'' + slot + '\', \'\', \'clear\')"><em style="color:var(--text-dim);">&mdash; Not obtained &mdash;</em></div>';
+
+  // BiS items
+  for (var j = 0; j < items.length; j++) {
+    if (isItemFilteredByProfession(items[j])) continue;
+    if (query && !items[j].name.toLowerCase().includes(query) && !items[j].src.toLowerCase().includes(query)) continue;
+    bisIds[items[j].id] = true;
+    html += '<div class="typeahead-option" data-idx="' + j + '" data-type="bis" onmousedown="selectTypeahead(\'' + slot + '\', \'' + j + '\', \'bis\')">';
+    html += '<div>' + items[j].name + '</div>';
+    html += '<div class="ta-src">' + items[j].src + '</div>';
+    html += '</div>';
+  }
+
+  // Wowhead search results (exclude items already in BiS list)
+  if (whResults.length > 0) {
+    html += '<div style="border-top:2px solid var(--border-dim);padding:4px 10px;font-size:0.65rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Wowhead Results</div>';
+    for (var k = 0; k < whResults.length; k++) {
+      var wh = whResults[k];
+      if (bisIds[wh.id]) continue;
+      html += '<div class="typeahead-option" data-type="wowhead" data-wh-id="' + wh.id + '" data-wh-name="' + wh.name.replace(/"/g, '&quot;') + '" onmousedown="selectWowheadItem(\'' + slot + '\',' + wh.id + ',\'' + wh.name.replace(/'/g, "\\'") + '\')">';
+      html += '<div>' + wh.name + '</div>';
+      var qualColors = {4:'var(--epic)',3:'var(--rare)',2:'var(--uncommon)',1:'#9d9d9d'};
+      var qCol = qualColors[wh.quality] || 'var(--text-dim)';
+      html += '<div class="ta-src" style="color:' + qCol + '">iLvl ' + wh.level + (wh.source || '') + '</div>';
+      html += '</div>';
+    }
+  } else if (query.length >= 3 && _whSearchTimer) {
+    html += '<div style="border-top:2px solid var(--border-dim);padding:6px 10px;font-size:0.7rem;color:var(--text-dim);font-style:italic;">Searching Wowhead...</div>';
+  }
+
+  dd.innerHTML = html;
+  if (activeTypeahead) activeTypeahead.highlightIdx = -1;
+}
+
+function searchWowhead(slot, query) {
+  var cacheKey = slot + ':' + query;
+  if (_whSearchCache[cacheKey]) {
+    renderTypeaheadOptions(slot, query, _whSearchCache[cacheKey]);
+    return;
+  }
+  var cleanQuery = query.replace(/['']/g, '').replace(/[^\w\s-]/g, ' ').trim();
+  if (!cleanQuery) { renderTypeaheadOptions(slot, query, []); return; }
+  var whUrl = 'https://www.wowhead.com/tbc/items/name:' + encodeURIComponent(cleanQuery) + '/min-req-level:60';
+  var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(whUrl);
+  fetch(url).then(function(res) { return res.text(); }).then(function(html) {
+    var match = html.match(/listviewitems\s*=\s*(\[.*?\]);/);
+    if (!match) { renderTypeaheadOptions(slot, query, []); return; }
+    try {
+      // Wowhead JSON has unquoted keys - fix common patterns
+      var jsonStr = match[1].replace(/,\s*firstseenpatch\s*:\s*\d+/g, '').replace(/,\s*popularity\s*:\s*\d+/g, '');
+      var items = JSON.parse(jsonStr);
+      // Filter to equippable gear only (classs 2=weapon, 4=armor, slot>0)
+      var results = [];
+      for (var i = 0; i < items.length && results.length < 15; i++) {
+        if ((items[i].classs === 4 || items[i].classs === 2) && items[i].slot > 0 && (items[i].quality || 0) >= 2) {
+          results.push({
+            id: items[i].id,
+            name: items[i].name,
+            quality: items[i].quality || 1,
+            level: items[i].level || 0,
+            slot: items[i].slot
+          });
+        }
+      }
+      results.sort(function(a, b) { return b.quality - a.quality || b.level - a.level; });
+      _whSearchCache[cacheKey] = results;
+      // Only render if this slot is still active
+      if (_whSearchSlot === slot) {
+        var input = document.getElementById('ta-input-' + slot);
+        renderTypeaheadOptions(slot, input ? input.value.toLowerCase().trim() : query, results);
+      }
+    } catch(e) {
+      renderTypeaheadOptions(slot, query, []);
+    }
+  }).catch(function() {
+    renderTypeaheadOptions(slot, query, []);
+  });
+}
+
+function selectWowheadItem(slot, id, name) {
+  trackItem(slot, 'c:' + id + ':' + name);
+  closeTypeahead(slot);
+  // Fetch stats from Wowhead and re-render when available
+  fetchCustomItemStats(id, function() {
+    renderCurrentView();
+  });
+}
+
+function selectTypeahead(slot, idx, type) {
+  if (type === 'clear') {
+    trackItem(slot, '');
+  } else {
+    trackItem(slot, idx);
+  }
+  closeTypeahead(slot);
+}
+
+function saveCustomItem(slot) {
+  var input = document.getElementById('ta-input-' + slot);
+  if (!input || !input.value.trim()) return;
+  var name = input.value.trim();
+  trackItem(slot, 'c:0:' + name);
+  closeTypeahead(slot);
+}
+
+function typeaheadKeydown(e, slot) {
+  var dd = document.getElementById('ta-dd-' + slot);
+  if (!dd || !dd.classList.contains('open')) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter') { openTypeahead(slot); e.preventDefault(); }
+    return;
+  }
+  var opts = dd.querySelectorAll('.typeahead-option');
+  if (!opts.length) return;
+  var idx = activeTypeahead ? activeTypeahead.highlightIdx : -1;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    idx = Math.min(idx + 1, opts.length - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    idx = Math.max(idx - 1, 0);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (idx >= 0 && idx < opts.length) {
+      var opt = opts[idx];
+      if (opt.getAttribute('data-type') === 'custom') {
+        saveCustomItem(slot);
+      } else if (opt.getAttribute('data-type') === 'wowhead') {
+        var whId = parseInt(opt.getAttribute('data-wh-id'));
+        var whName = opt.getAttribute('data-wh-name');
+        selectWowheadItem(slot, whId, whName);
+      } else {
+        selectTypeahead(slot, opt.getAttribute('data-idx'), opt.getAttribute('data-type'));
+      }
+    }
+    return;
+  } else if (e.key === 'Escape') {
+    closeTypeahead(slot);
+    return;
+  } else {
+    return;
+  }
+
+  // Update highlight
+  opts.forEach(function(o) { o.classList.remove('highlighted'); });
+  if (idx >= 0 && idx < opts.length) {
+    opts[idx].classList.add('highlighted');
+    opts[idx].scrollIntoView({block:'nearest'});
+  }
+  if (activeTypeahead) activeTypeahead.highlightIdx = idx;
+}
+
+function clearTypeahead(slot) {
+  trackItem(slot, '');
+}
+
+function renderTracker() {
+  var spec = specData();
+  var tracked = loadTracker();
+  var slotKeys = Object.keys(spec.slots);
+  var totalSlots = slotKeys.length;
+  var filledSlots = 0;
+
+  for (var i = 0; i < slotKeys.length; i++) {
+    if (tracked[slotKeys[i]] !== undefined && tracked[slotKeys[i]] !== "") filledSlots++;
+  }
+
+  var pct = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+
+  var html = '<div class="tracker-container">';
+
+  // Profession filter buttons
+  var profs = loadProfessions();
+  html += '<div class="profession-filters">';
+  for (var p = 0; p < ALL_PROFESSIONS.length; p++) {
+    var prof = ALL_PROFESSIONS[p];
+    var isActive = profs.indexOf(prof) !== -1;
+    html += '<button class="prof-btn' + (isActive ? ' active' : '') + '" onclick="toggleProfession(\'' + prof + '\')">' + prof + '</button>';
+  }
+  html += '</div>';
+
+  // Import button
+  html += '<div style="text-align:center;padding:4px 0 8px;">';
+  html += '<button class="import-addon-btn" onclick="showImportModal()">';
+  html += '<span style="font-size:1rem;">&#8681;</span> Import from Addon';
+  html += '</button>';
+  html += '</div>';
+
+  // Progress bar
+  html += '<div class="tracker-progress">';
+  html += '<div class="progress-label">Gear Progress: ' + filledSlots + ' / ' + totalSlots + ' slots filled</div>';
+  html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+  html += '<div class="progress-text">Type to search items below</div>';
+  html += '</div>';
+
+  // Stat summary
+  var trackerStats = getTrackerStats();
+  html += renderTrackerStats(trackerStats);
+
+  // Slot typeahead inputs
+  html += '<div class="tracker-slots">';
+  for (var i = 0; i < slotKeys.length; i++) {
+    var slot = slotKeys[i];
+    var items = spec.slots[slot];
+    var label = SLOT_LABELS[slot] || slot;
+    var trackedItem = getTrackedItem(slot);
+    var isOwned = !!trackedItem;
+    var displayName = isOwned ? trackedItem.name : '';
+
+    html += '<div class="tracker-slot">';
+    html += '<div class="tracker-slot-label">' + label + '</div>';
+    html += '<div class="typeahead-wrap">';
+    html += '<input type="text" class="typeahead-input" id="ta-input-' + slot + '" placeholder="Search or type any item..." value="' + displayName.replace(/"/g, '&quot;') + '"';
+    html += ' onfocus="openTypeahead(\'' + slot + '\')"';
+    html += ' oninput="filterTypeahead(\'' + slot + '\')"';
+    html += ' onkeydown="typeaheadKeydown(event, \'' + slot + '\')"';
+    html += ' onblur="setTimeout(function(){closeTypeahead(\'' + slot + '\')},200)"';
+    html += '>';
+    if (isOwned) html += '<button class="typeahead-clear" onclick="clearTypeahead(\'' + slot + '\')" title="Clear">&times;</button>';
+    html += '<div class="typeahead-dropdown" id="ta-dd-' + slot + '"></div>';
+    html += '</div>';
+    if (isOwned) {
+      html += '<span class="owned-badge">&#10003; Owned</span>';
+      if (trackedItem.isCustom) html += '<span style="font-size:0.6rem;color:var(--text-dim);margin-left:2px;">(custom)</span>';
+    } else {
+      html += '<span class="needed-badge">Needed</span>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Actions
+  html += '<div class="tracker-actions">';
+  html += '<button class="reset-btn" onclick="resetTracker()">Reset All</button>';
+  html += '</div>';
+
+  html += '</div>';
+  document.getElementById("trackerView").innerHTML = html;
+  refreshWowheadLinks();
+}
+
+// ---------------------------------------------------------------------------
+// Addon Import
+// ---------------------------------------------------------------------------
+function parseAddonExport(text) {
+  if (!text || typeof text !== 'string') return null;
+  var lines = text.trim().split('\n');
+  if (!lines.length || lines[0].trim() !== 'TIERZERO:1') return null;
+
+  var result = { equipped: {}, bags: [], bank: [], charName: '' };
+  for (var i = 1; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line === 'END') break;
+    var parts = line.split(':');
+    var type = parts[0];
+
+    if (type === 'CHAR' && parts.length >= 2) {
+      result.charName = parts.slice(1).join(':');
+    } else if (type === 'EQ' && parts.length >= 6) {
+      var slot = parts[1];
+      result.equipped[slot] = {
+        id: parseInt(parts[2], 10),
+        name: parts.slice(3, parts.length - 2).join(':'),
+        quality: parseInt(parts[parts.length - 2], 10),
+        ilvl: parseInt(parts[parts.length - 1], 10)
+      };
+    } else if ((type === 'BAG' || type === 'BANK') && parts.length >= 5) {
+      var item = {
+        id: parseInt(parts[1], 10),
+        name: parts.slice(2, parts.length - 2).join(':'),
+        quality: parseInt(parts[parts.length - 2], 10),
+        ilvl: parseInt(parts[parts.length - 1], 10)
+      };
+      if (type === 'BAG') result.bags.push(item);
+      else result.bank.push(item);
+    }
+  }
+  return result;
+}
+
+function importEquippedGear(parsed) {
+  if (!parsed || !parsed.equipped) return { total: 0, bis: 0, custom: 0 };
+  var spec = specData();
+  var bisCount = 0, customCount = 0, total = 0;
+
+  var slots = Object.keys(parsed.equipped);
+  for (var i = 0; i < slots.length; i++) {
+    var slot = slots[i];
+    if (!spec.slots[slot]) continue;
+    var importedItem = parsed.equipped[slot];
+    total++;
+
+    // Check if this item matches any BiS item in this slot
+    var bisIdx = -1;
+    var slotItems = spec.slots[slot];
+    for (var j = 0; j < slotItems.length; j++) {
+      if (slotItems[j].id === importedItem.id) {
+        bisIdx = j;
+        break;
+      }
+    }
+
+    if (bisIdx >= 0) {
+      trackItem(slot, bisIdx);
+      bisCount++;
+    } else {
+      trackItem(slot, 'c:' + importedItem.id + ':' + importedItem.name);
+      // Fetch stats for custom item
+      fetchCustomItemStats(importedItem.id, function() {
+        renderTracker();
+      });
+      customCount++;
+    }
+  }
+
+  return { total: total, bis: bisCount, custom: customCount };
+}
+
+function findBagSuggestions(parsed) {
+  if (!parsed) return [];
+  var spec = specData();
+  var tracked = loadTracker();
+  var suggestions = [];
+  var allItems = (parsed.bags || []).concat(parsed.bank || []);
+
+  for (var i = 0; i < allItems.length; i++) {
+    var bagItem = allItems[i];
+    var source = i < parsed.bags.length ? 'bag' : 'bank';
+
+    // Check every slot for a BiS match
+    var slotKeys = Object.keys(spec.slots);
+    for (var s = 0; s < slotKeys.length; s++) {
+      var slot = slotKeys[s];
+      var slotItems = spec.slots[slot];
+
+      for (var j = 0; j < slotItems.length; j++) {
+        if (slotItems[j].id === bagItem.id) {
+          // Found a BiS match — check if it's better than current
+          var currentVal = tracked[slot];
+          var currentRank = -1;
+          if (currentVal !== undefined && currentVal !== '') {
+            var cv = String(currentVal);
+            if (cv.indexOf('c:') === 0) {
+              currentRank = 999; // custom items rank below all BiS
+            } else {
+              currentRank = parseInt(cv, 10);
+            }
+          }
+          // Lower index = higher rank. If no item equipped or bag item is better ranked:
+          if (currentVal === undefined || currentVal === '' || j < currentRank) {
+            var currentName = 'empty';
+            var trackedItem = getTrackedItem(slot);
+            if (trackedItem) currentName = trackedItem.name;
+
+            suggestions.push({
+              item: bagItem,
+              bisIdx: j,
+              slot: slot,
+              currentName: currentName,
+              source: source
+            });
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Sort by BiS rank (best upgrades first)
+  suggestions.sort(function(a, b) { return a.bisIdx - b.bisIdx; });
+  return suggestions;
+}
+
+function renderBagSuggestions(parsed, container) {
+  var suggestions = findBagSuggestions(parsed);
+  if (!suggestions.length) {
+    container.innerHTML = '<div style="font-size:0.82rem;color:var(--text-dim);padding:8px 0;">No upgrades found in bags/bank.</div>';
+    return;
+  }
+
+  var html = '<h4>Upgrades in Your Bags/Bank</h4>';
+  for (var i = 0; i < suggestions.length; i++) {
+    var sug = suggestions[i];
+    var label = SLOT_LABELS[sug.slot] || sug.slot;
+    html += '<div class="bag-sug-item">';
+    html += '<div class="bag-sug-info">';
+    html += '<a href="https://www.wowhead.com/tbc/item=' + sug.item.id + '">' + sug.item.name + '</a>';
+    html += ' <span style="font-size:0.68rem;color:var(--text-dim);">(ilvl ' + sug.item.ilvl + ')</span>';
+    html += '<div class="bag-sug-slot">' + label + ' — currently: ' + sug.currentName + ' <span style="opacity:0.6;">(' + sug.source + ')</span></div>';
+    html += '</div>';
+    html += '<button class="bag-sug-equip" onclick="equipSuggestion(\'' + sug.slot + '\',' + sug.bisIdx + ')">Equip</button>';
+    html += '</div>';
+  }
+  container.innerHTML = html;
+  refreshWowheadLinks();
+}
+
+function equipSuggestion(slot, bisIdx) {
+  trackItem(slot, bisIdx);
+  // Re-render suggestions if modal is still open
+  var sugContainer = document.getElementById('import-suggestions');
+  if (sugContainer && sugContainer._parsedData) {
+    renderBagSuggestions(sugContainer._parsedData, sugContainer);
+  }
+}
+
+function showImportModal() {
+  // Remove existing if any
+  hideImportModal();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'import-overlay';
+  overlay.id = 'import-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) hideImportModal(); };
+
+  var panel = document.createElement('div');
+  panel.className = 'import-panel';
+  panel.innerHTML =
+    '<h3>Paste Addon Export</h3>' +
+    '<div class="import-instructions">In WoW, type <strong>/tz</strong> then <strong>Ctrl+C</strong>. Paste here.</div>' +
+    '<textarea id="import-textarea" rows="8" placeholder="TIERZERO:1\nCHAR:...\nEQ:head:12345:...\n..."></textarea>' +
+    '<div class="import-btn-row">' +
+      '<button class="import-primary" onclick="doImport()">Import Equipped Gear</button>' +
+      '<button class="import-cancel" onclick="hideImportModal()">Cancel</button>' +
+    '</div>' +
+    '<div id="import-msg"></div>' +
+    '<div id="import-suggestions" class="bag-suggestions"></div>';
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  // Focus textarea
+  setTimeout(function() {
+    var ta = document.getElementById('import-textarea');
+    if (ta) ta.focus();
+  }, 50);
+}
+
+function hideImportModal() {
+  var overlay = document.getElementById('import-overlay');
+  if (overlay) overlay.remove();
+}
+
+function doImport() {
+  var ta = document.getElementById('import-textarea');
+  var msgEl = document.getElementById('import-msg');
+  var sugEl = document.getElementById('import-suggestions');
+  if (!ta) return;
+
+  var parsed = parseAddonExport(ta.value);
+  if (!parsed) {
+    msgEl.className = 'import-msg error';
+    msgEl.textContent = 'Invalid export string. Make sure it starts with TIERZERO:1';
+    return;
+  }
+
+  var result = importEquippedGear(parsed);
+  msgEl.className = 'import-msg success';
+  msgEl.textContent = 'Imported ' + result.total + ' items. ' + result.bis + ' matched BiS list, ' + result.custom + ' added as custom.';
+  if (parsed.charName) {
+    msgEl.textContent += ' (Character: ' + parsed.charName + ')';
+  }
+
+  // Save bag/bank data for future reference
+  if (parsed.bags.length || parsed.bank.length) {
+    try {
+      localStorage.setItem('prebis-inventory-' + currentSpec, JSON.stringify({ bags: parsed.bags, bank: parsed.bank }));
+    } catch(e) {}
+  }
+
+  // Show bag/bank suggestions
+  sugEl._parsedData = parsed;
+  renderBagSuggestions(parsed, sugEl);
+
+  renderTracker();
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+function init() {
+  buildSpecPicker();
+
+  // Set up view tab click handlers
+  document.querySelectorAll('.view-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { setView(btn.dataset.view); });
+  });
+
+  // Cross-tab: re-render visible view when tracker changes
+  window.addEventListener('tracker-changed', function() {
+    if (currentView === 'routes') renderRoutes();
+    else if (currentView === 'sheet' && sheetMode === 'mygear') renderSheet();
+  });
+
+  // Close typeahead on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.typeahead-wrap')) {
+      document.querySelectorAll('.typeahead-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    }
+  });
+
+  // If spec already chosen (from localStorage), go straight to main UI
+  if (currentSpec && SPECS[currentSpec]) {
+    showMainUI();
+    renderCurrentView();
+  } else {
+    showSpecPicker();
+  }
+}
+
+init();
+
+</script>
+</body>
+</html>
