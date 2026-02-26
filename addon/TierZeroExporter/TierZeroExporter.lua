@@ -47,19 +47,56 @@ local cachedBags = {}
 -- ---------------------------------------------------------------------------
 -- Scanning
 -- ---------------------------------------------------------------------------
+local function ParseItemLink(link)
+    if not link then return nil end
+    -- TBC link: |Hitem:itemId:enchantId:gem1:gem2:gem3:suffixId:uniqueId:level|h[Name]|h
+    local itemId, enchantId, gem1, gem2, gem3 = link:match("item:(%d+):(%d*):(%d*):(%d*):(%d*)")
+    return tonumber(itemId), tonumber(enchantId) or 0, tonumber(gem1) or 0, tonumber(gem2) or 0, tonumber(gem3) or 0
+end
+
+-- Hidden tooltip for scanning enchant names
+local scanTip = CreateFrame("GameTooltip", "TZScanTip", nil, "GameTooltipTemplate")
+scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+
+local function GetEnchantName(invSlot)
+    scanTip:ClearLines()
+    scanTip:SetInventoryItem("player", invSlot)
+    for i = 2, scanTip:NumLines() do
+        local line = _G["TZScanTipTextLeft" .. i]
+        if line then
+            local r, g, b = line:GetTextColor()
+            -- Green text = enchant (r≈0, g≈1, b≈0)
+            if g > 0.9 and r < 0.2 and b < 0.2 then
+                return line:GetText() or ""
+            end
+        end
+    end
+    return ""
+end
+
 local function ScanEquipped()
     local items = {}
     for invSlot, appSlot in pairs(SLOT_MAP) do
-        local itemId = GetInventoryItemID("player", invSlot)
-        if itemId then
-            local name, _, quality, ilvl, _, _, _, _, _, _, _, classID = GetItemInfo(itemId)
-            if name then
-                items[appSlot] = {
-                    id = itemId,
-                    name = name,
-                    quality = quality or 0,
-                    ilvl = ilvl or 0,
-                }
+        local link = GetInventoryItemLink("player", invSlot)
+        if link then
+            local itemId, enchantId, gem1, gem2, gem3 = ParseItemLink(link)
+            if itemId then
+                local name, _, quality, ilvl = GetItemInfo(itemId)
+                if name then
+                    local enchantName = ""
+                    if enchantId and enchantId > 0 then
+                        enchantName = GetEnchantName(invSlot)
+                    end
+                    items[appSlot] = {
+                        id = itemId,
+                        name = name,
+                        quality = quality or 0,
+                        ilvl = ilvl or 0,
+                        enchant = enchantId,
+                        enchantName = enchantName,
+                        gems = { gem1, gem2, gem3 },
+                    }
+                end
             end
         end
     end
@@ -151,17 +188,23 @@ end
 -- ---------------------------------------------------------------------------
 -- Export String Builder
 -- ---------------------------------------------------------------------------
+local function GemsString(gems)
+    if not gems then return "0,0,0" end
+    return (gems[1] or 0) .. "," .. (gems[2] or 0) .. "," .. (gems[3] or 0)
+end
+
 local function BuildExportString()
     local lines = {}
-    table.insert(lines, "TIERZERO:1")
+    table.insert(lines, "TIERZERO:2")
 
     local name = UnitName("player")
     local realm = GetRealmName()
     table.insert(lines, "CHAR:" .. (name or "Unknown") .. "-" .. (realm or "Unknown"))
     table.insert(lines, "SPEC:unknown")
 
+    -- EQ format v2: EQ:slot:itemId:name:quality:ilvl:enchantId:gem1,gem2,gem3:enchantName
     for appSlot, info in pairs(cachedEquipped) do
-        table.insert(lines, "EQ:" .. appSlot .. ":" .. info.id .. ":" .. info.name .. ":" .. info.quality .. ":" .. info.ilvl)
+        table.insert(lines, "EQ:" .. appSlot .. ":" .. info.id .. ":" .. info.name .. ":" .. info.quality .. ":" .. info.ilvl .. ":" .. (info.enchant or 0) .. ":" .. GemsString(info.gems) .. ":" .. (info.enchantName or ""))
     end
 
     for _, info in ipairs(cachedBags) do
