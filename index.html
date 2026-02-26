@@ -181,6 +181,12 @@
     .reset-btn { color:#ff5555!important; border-color:rgba(255,60,60,0.25)!important; }
     .reset-btn:hover { background:rgba(255,60,60,0.08)!important; border-color:#ff5555!important; }
 
+    /* Addon banner */
+    .addon-banner { text-align:center; font-size:0.8rem; color:var(--text-dim); padding:10px 16px; margin-bottom:14px; background:rgba(200,170,110,0.06); border:1px solid var(--border-dim); border-radius:8px; line-height:1.7; }
+    .addon-dl-link { color:var(--text-gold); font-weight:600; margin-left:6px; text-decoration:underline; cursor:pointer; }
+    .addon-dl-link:hover { color:#fff; }
+    .addon-hint { display:block; font-size:0.7rem; color:var(--text-dim); margin-top:2px; }
+
     /* Wowhead links - let their script handle colors/icons */
     a[href*="wowhead.com"] { text-decoration:none; }
     .wowhead-tooltip { transform:scale(0.75); transform-origin:top left; }
@@ -393,6 +399,11 @@
 
   <div id="specPickerOverlay" class="spec-picker-overlay" style="display:none;">
     <h2>Choose Your Spec</h2>
+    <div class="addon-banner">
+      For best results, import your gear directly from the game using our addon.
+      <a href="https://github.com/BlakeDonn/tierzero/tree/main/addon/TierZeroExporter" target="_blank" class="addon-dl-link">Download TierZero Exporter</a>
+      <span class="addon-hint">Copy the <strong>TierZeroExporter</strong> folder into your WoW <strong>Interface/AddOns</strong> directory. Type <strong>/tz</strong> in-game, then paste into the Import panel.</span>
+    </div>
     <div class="spec-picker-grid" id="specPickerGrid"></div>
   </div>
 
