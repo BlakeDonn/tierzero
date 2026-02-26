@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tier Zero — TBC Pre-Raid Gear Planner</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2345b35a'/%3E%3Cstop offset='1' stop-color='%231a6b30'/%3E%3C/linearGradient%3E%3ClinearGradient id='bg' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%230f1f14'/%3E%3Cstop offset='1' stop-color='%230a0f0c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23bg)' stroke='url(%23g)' stroke-width='2.5'/%3E%3Ctext x='32' y='30' text-anchor='middle' font-family='serif' font-weight='900' font-size='22' fill='url(%23g)' letter-spacing='-1'%3EMW%3C/text%3E%3Cline x1='14' y1='42' x2='50' y2='42' stroke='url(%23g)' stroke-width='1.5' stroke-linecap='round'/%3E%3Ctext x='32' y='52' text-anchor='middle' font-family='sans-serif' font-size='8' fill='%23367a45' letter-spacing='2'%3ETIER 0%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0d890'/%3E%3Cstop offset='1' stop-color='%23a07830'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='30' fill='%230d0d1a' stroke='url(%23g)' stroke-width='3'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-weight='bold' font-size='36' fill='url(%23g)'%3EW%3C/text%3E%3C/svg%3E">
 
   <!-- Wowhead Tooltips -->
   <script>const whTooltips = {colorLinks: true, iconizeLinks: true, renameLinks: false};</script>
@@ -31,6 +31,13 @@
       --legendary: #ff8000;
       --mage-color: #69ccf0;
       --paladin-color: #f58cba;
+      --warrior-color: #c79c6e;
+      --rogue-color: #fff569;
+      --hunter-color: #abd473;
+      --warlock-color: #9482c9;
+      --priest-color: #ffffff;
+      --shaman-color: #0070de;
+      --druid-color: #ff7d0a;
     }
     *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Roboto',sans-serif; background:var(--bg-dark); color:var(--text-gold); min-height:100vh; line-height:1.5; }
@@ -55,19 +62,63 @@
     .spec-tab.active[data-class="paladin"] { border-bottom-color:var(--paladin-color); color:var(--paladin-color); }
 
     /* Spec Picker (initial screen) */
-    .spec-picker-overlay { position:fixed; inset:0; z-index:500; background:var(--bg-dark); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
-    .spec-picker-overlay h2 { font-family:'Cinzel',serif; font-size:2rem; color:var(--border-gold); text-shadow:0 0 20px rgba(200,170,110,0.3); margin:0; }
+    .spec-picker-overlay { position:fixed; inset:0; z-index:500; background:var(--bg-dark); background-image:radial-gradient(ellipse at 50% 0%, rgba(200,170,110,0.06) 0%, transparent 60%); display:flex; flex-direction:column; align-items:center; gap:28px; overflow-y:auto; padding:10px 0 40px; }
+    .spec-picker-overlay h2 { font-family:'Cinzel',serif; font-size:1.8rem; color:var(--border-gold); text-shadow:0 0 30px rgba(200,170,110,0.4); margin:0; letter-spacing:2px; }
     .landing-title { text-align:center; }
-    .landing-presents { font-family:'Roboto',sans-serif; font-size:0.65rem; text-transform:uppercase; letter-spacing:3px; color:var(--text-dim); display:block; margin-bottom:4px; }
-    .landing-sub { font-family:'Roboto',sans-serif; font-size:0.7rem; letter-spacing:1px; color:var(--text-dim); display:block; margin-top:2px; }
-    .spec-picker-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; max-width:700px; width:100%; padding:0 20px; }
-    .spec-pick-card { background:var(--bg-panel); border:2px solid var(--border-dim); border-radius:10px; padding:20px 16px; text-align:center; cursor:pointer; transition:all 0.2s; }
-    .spec-pick-card:hover { border-color:var(--border-gold); background:var(--bg-slot-hover); transform:translateY(-2px); }
-    .spec-pick-card .pick-icon { font-size:2rem; margin-bottom:6px; }
-    .spec-pick-card .pick-name { font-family:'Cinzel',serif; font-size:1rem; color:var(--text-gold); }
-    .spec-pick-card .pick-class { font-size:0.75rem; color:var(--text-dim); margin-top:2px; }
-    .spec-pick-card[data-class="mage"]:hover { border-color:var(--mage-color); }
-    .spec-pick-card[data-class="paladin"]:hover { border-color:var(--paladin-color); }
+    .landing-presents { font-family:'Roboto',sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:4px; color:var(--text-dim); display:block; margin-bottom:6px; }
+    .landing-sub { font-family:'Roboto',sans-serif; font-size:0.72rem; letter-spacing:1.5px; color:var(--text-dim); display:block; margin-top:4px; }
+    .landing-divider { width:50px; height:1px; background:linear-gradient(90deg,transparent,var(--border-gold),transparent); margin:6px auto 0; }
+    .landing-select { font-family:'Cinzel',serif; font-size:0.8rem; color:var(--border-gold); letter-spacing:1.5px; text-shadow:0 0 12px rgba(200,170,110,0.4); animation:selectPulse 2.5s ease-in-out infinite; }
+    @keyframes selectPulse { 0%,100% { opacity:0.3; text-shadow:0 0 4px rgba(200,170,110,0.1); } 50% { opacity:1; text-shadow:0 0 30px rgba(200,170,110,0.7), 0 0 60px rgba(200,170,110,0.3); } }
+    .spec-picker-ring { position:relative; width:640px; height:620px; margin:0 auto; flex-shrink:0; }
+    .class-node { position:absolute; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; transition:all 0.25s; z-index:2; }
+    .class-node .class-icon { width:48px; height:48px; border-radius:10px; border:2px solid var(--border-dim); box-shadow:0 2px 10px rgba(0,0,0,0.4); transition:all 0.25s; }
+    .class-node:hover .class-icon { transform:scale(1.15); border-color:var(--border-gold); box-shadow:0 4px 20px rgba(200,170,110,0.3); }
+    .class-node.open .class-icon { transform:scale(1.15); box-shadow:0 4px 20px rgba(200,170,110,0.3); }
+    .class-node .class-name { font-family:'Cinzel',serif; font-size:0.7rem; font-weight:600; opacity:0.7; transition:all 0.2s; }
+    .class-node:hover .class-name { opacity:1; }
+    .class-node .class-card-specs { display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:6px; width:180px; background:var(--bg-panel); border:2px solid var(--border-dim); border-radius:10px; overflow:hidden; z-index:10; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
+    .class-node.open .class-card-specs { display:block; }
+    .class-node.drop-up .class-card-specs { top:auto; bottom:100%; margin-top:0; margin-bottom:6px; }
+    .class-node.drop-left .class-card-specs { top:50%; left:auto; right:100%; transform:translateY(-50%); margin-top:0; margin-right:6px; }
+    .class-node.drop-right .class-card-specs { top:50%; left:100%; transform:translateY(-50%); margin-top:0; margin-left:6px; }
+    .spec-picker-center-content { position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:12px; z-index:1; pointer-events:auto; max-width:340px; }
+    .spec-picker-center-content > * { pointer-events:auto; }
+    .class-node .class-card-specs { background:rgba(0,0,0,0.15); }
+    .spec-option { padding:7px 10px; font-size:0.72rem; color:var(--text-dim); cursor:pointer; transition:all 0.15s; border-bottom:1px solid rgba(42,42,62,0.3); display:flex; align-items:center; gap:7px; }
+    .spec-icon { width:18px; height:18px; border-radius:4px; border:1px solid var(--border-dim); }
+    .spec-option:last-child { border-bottom:none; }
+    .spec-option:hover { background:rgba(200,170,110,0.1); color:var(--text-gold); padding-left:14px; }
+    .spec-option:hover .spec-icon { border-color:var(--border-gold); }
+    .spec-option.disabled { opacity:0.3; cursor:default; }
+    .spec-option.disabled:hover { background:none; color:var(--text-dim); padding-left:10px; }
+    .class-node[data-class="mage"] .class-name { color:var(--mage-color); }
+    .class-node[data-class="mage"]:hover .class-icon, .class-node[data-class="mage"].open .class-icon { border-color:var(--mage-color); }
+    .class-node[data-class="mage"].open .class-card-specs { border-color:var(--mage-color); }
+    .class-node[data-class="paladin"] .class-name { color:var(--paladin-color); }
+    .class-node[data-class="paladin"]:hover .class-icon, .class-node[data-class="paladin"].open .class-icon { border-color:var(--paladin-color); }
+    .class-node[data-class="paladin"].open .class-card-specs { border-color:var(--paladin-color); }
+    .class-node[data-class="warrior"] .class-name { color:var(--warrior-color); }
+    .class-node[data-class="warrior"]:hover .class-icon, .class-node[data-class="warrior"].open .class-icon { border-color:var(--warrior-color); }
+    .class-node[data-class="warrior"].open .class-card-specs { border-color:var(--warrior-color); }
+    .class-node[data-class="rogue"] .class-name { color:var(--rogue-color); }
+    .class-node[data-class="rogue"]:hover .class-icon, .class-node[data-class="rogue"].open .class-icon { border-color:var(--rogue-color); }
+    .class-node[data-class="rogue"].open .class-card-specs { border-color:var(--rogue-color); }
+    .class-node[data-class="hunter"] .class-name { color:var(--hunter-color); }
+    .class-node[data-class="hunter"]:hover .class-icon, .class-node[data-class="hunter"].open .class-icon { border-color:var(--hunter-color); }
+    .class-node[data-class="hunter"].open .class-card-specs { border-color:var(--hunter-color); }
+    .class-node[data-class="warlock"] .class-name { color:var(--warlock-color); }
+    .class-node[data-class="warlock"]:hover .class-icon, .class-node[data-class="warlock"].open .class-icon { border-color:var(--warlock-color); }
+    .class-node[data-class="warlock"].open .class-card-specs { border-color:var(--warlock-color); }
+    .class-node[data-class="priest"] .class-name { color:var(--priest-color); }
+    .class-node[data-class="priest"]:hover .class-icon, .class-node[data-class="priest"].open .class-icon { border-color:var(--priest-color); }
+    .class-node[data-class="priest"].open .class-card-specs { border-color:var(--priest-color); }
+    .class-node[data-class="shaman"] .class-name { color:var(--shaman-color); }
+    .class-node[data-class="shaman"]:hover .class-icon, .class-node[data-class="shaman"].open .class-icon { border-color:var(--shaman-color); }
+    .class-node[data-class="shaman"].open .class-card-specs { border-color:var(--shaman-color); }
+    .class-node[data-class="druid"] .class-name { color:var(--druid-color); }
+    .class-node[data-class="druid"]:hover .class-icon, .class-node[data-class="druid"].open .class-icon { border-color:var(--druid-color); }
+    .class-node[data-class="druid"].open .class-card-specs { border-color:var(--druid-color); }
 
 
     /* View Tabs */
@@ -187,10 +238,10 @@
     .reset-btn:hover { background:rgba(255,60,60,0.08)!important; border-color:#ff5555!important; }
 
     /* Addon banner */
-    .addon-banner { text-align:center; font-size:0.8rem; color:var(--text-dim); padding:10px 16px; margin-bottom:14px; background:rgba(200,170,110,0.06); border:1px solid var(--border-dim); border-radius:8px; line-height:1.7; }
+    .addon-banner { text-align:center; font-size:0.68rem; color:var(--text-dim); padding:8px 12px; margin-bottom:0; background:rgba(200,170,110,0.06); border:1px solid var(--border-dim); border-radius:8px; line-height:1.5; }
     .addon-dl-link { color:var(--text-gold); font-weight:600; margin-left:6px; text-decoration:underline; cursor:pointer; }
     .addon-dl-link:hover { color:#fff; }
-    .addon-hint { display:block; font-size:0.7rem; color:var(--text-dim); margin-top:2px; }
+    .addon-hint { display:block; font-size:0.6rem; color:var(--text-dim); margin-top:2px; }
 
     /* Wowhead links - let their script handle colors/icons */
     a[href*="wowhead.com"] { text-decoration:none; }
@@ -360,7 +411,10 @@
       .priority-sidebar { position:static; }
       .source-list-detail { grid-template-columns:1fr; }
       .detail-panel { position:static; }
-      .spec-picker-grid { grid-template-columns:1fr 1fr; }
+      .spec-picker-ring { width:100%; height:auto; position:static; display:flex; flex-direction:column; align-items:center; gap:16px; }
+      .class-node { position:static !important; }
+      .spec-picker-center-content { position:static; transform:none; }
+      .class-node .class-card-specs { position:static; transform:none; width:100%; margin-top:4px; }
     }
 
     /* ===== Import Modal ===== */
@@ -405,18 +459,23 @@
   </div>
 
   <div id="specPickerOverlay" class="spec-picker-overlay" style="display:none;">
-    <div class="landing-title">
-      <span class="landing-presents">writhkin presents</span>
-      <h2>Tier Zero</h2>
-      <span class="landing-sub">TBC Gear Planner</span>
+    <div class="spec-picker-ring" id="specPickerRing">
+      <div class="spec-picker-center-content">
+        <div class="landing-title">
+          <span class="landing-presents">writhkin presents</span>
+          <h2>Tier Zero</h2>
+          <span class="landing-sub">TBC Gear Planner</span>
+          <div class="landing-divider"></div>
+        </div>
+        <div class="addon-banner">
+          Import your gear for the best experience
+          <br><a href="https://github.com/BlakeDonn/tierzero/raw/main/TierZeroExporter.zip" download class="addon-dl-link">&#8681; Download Addon</a>
+          <span class="addon-hint">Install addon, type <strong>/tz</strong> in-game, then import below.</span>
+          <button class="import-addon-btn" onclick="showImportModal()" style="margin-top:6px;">Import from Addon</button>
+        </div>
+        <span class="landing-select">Select your class to begin</span>
+      </div>
     </div>
-    <div class="addon-banner">
-      For best results, import your gear directly from the game using our addon.
-      <a href="https://github.com/BlakeDonn/tierzero/raw/main/TierZeroExporter.zip" download class="addon-dl-link">Download TierZero Exporter</a>
-      <span class="addon-hint">Copy the <strong>TierZeroExporter</strong> folder into your WoW <strong>Interface/AddOns</strong> directory. Type <strong>/tz</strong> in-game, then paste into the Import panel.</span>
-      <button class="import-addon-btn" onclick="showImportModal()" style="margin-top:8px;">&#8681; Import from Addon</button>
-    </div>
-    <div class="spec-picker-grid" id="specPickerGrid"></div>
   </div>
 
   <div class="view active" id="sheetView"></div>
@@ -1225,21 +1284,121 @@ function qualityClass(q) {
 // ---------------------------------------------------------------------------
 // Tab / Navigation — Spec Picker
 // ---------------------------------------------------------------------------
+var WOW_ICON = "https://wow.zamimg.com/images/wow/icons/medium/";
+var ALL_CLASSES = [
+  {name:"Warrior",icon:"classicon_warrior"},
+  {name:"Paladin",icon:"classicon_paladin"},
+  {name:"Hunter",icon:"classicon_hunter"},
+  {name:"Rogue",icon:"classicon_rogue"},
+  {name:"Priest",icon:"classicon_priest"},
+  {name:"Shaman",icon:"classicon_shaman"},
+  {name:"Mage",icon:"classicon_mage"},
+  {name:"Warlock",icon:"classicon_warlock"},
+  {name:"Druid",icon:"classicon_druid"}
+];
+var SPEC_ICONS = {
+  "Warrior":{"Arms":"ability_rogue_eviscerate","Fury":"ability_warrior_innerrage","Protection":"ability_warrior_defensivestance"},
+  "Paladin":{"Holy":"spell_holy_holybolt","Protection":"spell_holy_devotionaura","Retribution":"spell_holy_auraoflight"},
+  "Hunter":{"Beast Mastery":"ability_hunter_beasttaming","Marksmanship":"ability_marksmanship","Survival":"ability_hunter_swiftstrike"},
+  "Rogue":{"Assassination":"ability_rogue_eviscerate","Combat":"ability_backstab","Subtlety":"ability_stealth"},
+  "Priest":{"Discipline":"spell_holy_wordfortitude","Holy":"spell_holy_guardianspirit","Shadow":"spell_shadow_shadowwordpain"},
+  "Shaman":{"Elemental":"spell_nature_lightning","Enhancement":"spell_nature_lightningshield","Restoration":"spell_nature_magicimmunity"},
+  "Mage":{"Arcane":"spell_holy_magicalsentry","Fire":"spell_fire_firebolt02","Frost":"spell_frost_frostbolt02"},
+  "Warlock":{"Affliction":"spell_shadow_deathcoil","Demonology":"spell_shadow_metamorphosis","Destruction":"spell_shadow_rainoffire"},
+  "Druid":{"Balance":"spell_nature_starfall","Feral":"ability_racial_bearform","Restoration":"spell_nature_healingtouch"}
+};
+
+var ALL_SPECS_MAP = {
+  "Warrior":["Arms","Fury","Protection"],
+  "Paladin":["Holy","Protection","Retribution"],
+  "Hunter":["Beast Mastery","Marksmanship","Survival"],
+  "Rogue":["Assassination","Combat","Subtlety"],
+  "Priest":["Discipline","Holy","Shadow"],
+  "Shaman":["Elemental","Enhancement","Restoration"],
+  "Mage":["Arcane","Fire","Frost"],
+  "Warlock":["Affliction","Demonology","Destruction"],
+  "Druid":["Balance","Feral","Restoration"]
+};
+
+function toggleClassNode(el) {
+  var wasOpen = el.classList.contains('open');
+  // Close all others
+  document.querySelectorAll('.class-node.open').forEach(function(n) { n.classList.remove('open'); });
+  if (!wasOpen) el.classList.add('open');
+}
+
 function buildSpecPicker() {
-  var grid = document.getElementById("specPickerGrid");
-  grid.innerHTML = "";
+  var specsByClass = {};
   var keys = Object.keys(SPECS);
   for (var i = 0; i < keys.length; i++) {
-    var key = keys[i];
-    var spec = SPECS[key];
-    var card = document.createElement("div");
-    card.className = "spec-pick-card";
-    card.setAttribute("data-class", spec.class.toLowerCase());
-    card.innerHTML = '<div class="pick-icon">' + spec.icon + '</div>' +
-      '<div class="pick-name">' + spec.spec + '</div>' +
-      '<div class="pick-class">' + spec.class + '</div>';
-    card.onclick = (function(k) { return function() { pickSpec(k); }; })(key);
-    grid.appendChild(card);
+    var cls = SPECS[keys[i]].class;
+    if (!specsByClass[cls]) specsByClass[cls] = [];
+    specsByClass[cls].push(keys[i]);
+  }
+
+  var ring = document.getElementById("specPickerRing");
+  // Remove old nodes but keep center content
+  ring.querySelectorAll('.class-node').forEach(function(n) { n.remove(); });
+
+  // Scale the whole ring to fit viewport while preserving the zero shape
+  var vh = window.innerHeight;
+  var vw = window.innerWidth;
+  var scale = Math.min((vh - 20) / 620, (vw - 20) / 640, 1);
+  ring.style.transform = scale < 1 ? 'scale(' + scale.toFixed(3) + ')' : '';
+  ring.style.transformOrigin = 'top center';
+  ring.style.width = '640px';
+  ring.style.height = '620px';
+  ring.style.marginBottom = scale < 1 ? Math.round((620 * scale) - 620) + 'px' : '';
+
+  var count = ALL_CLASSES.length; // 9
+  var rx = 255; // horizontal radius
+  var ry = 270; // vertical radius
+  var cx = 320; // center x
+  var cy = 310; // center y
+  var startAngle = -Math.PI / 2; // start at top
+
+  for (var i = 0; i < count; i++) {
+    var cls = ALL_CLASSES[i];
+    var angle = startAngle + (2 * Math.PI * i / count);
+    var x = cx + rx * Math.cos(angle) - 30;
+    var y = cy + ry * Math.sin(angle) - 35;
+
+    var node = document.createElement("div");
+    // Drop directions: 0=Warrior(top,down), 1=Paladin(right,right), 2=Hunter(right,left),
+    // 3=Rogue(bottom-right,up), 4=Priest(bottom,up), 5=Shaman(bottom-left,up),
+    // 6=Mage(left,right), 7=Warlock(left,right), 8=Druid(top-left,left)
+    var dropDirs = ["","drop-right","drop-right","drop-right","drop-right","drop-left","drop-left","drop-left","drop-left"];
+    var dropClass = dropDirs[i] ? " " + dropDirs[i] : "";
+    node.className = "class-node" + dropClass;
+    node.setAttribute("data-class", cls.name.toLowerCase());
+    node.style.left = x + "px";
+    node.style.top = y + "px";
+
+    var html = '<img class="class-icon" src="' + WOW_ICON + cls.icon + '.jpg" alt="' + cls.name + '" onclick="toggleClassNode(this.parentElement)">';
+    html += '<div class="class-name">' + cls.name + '</div>';
+
+    html += '<div class="class-card-specs">';
+    var possibleSpecs = ALL_SPECS_MAP[cls.name] || [];
+    var specIcons = SPEC_ICONS[cls.name] || {};
+    for (var s = 0; s < possibleSpecs.length; s++) {
+      var specName = possibleSpecs[s];
+      var specIcon = specIcons[specName] || "";
+      var iconImg = specIcon ? '<img class="spec-icon" src="' + WOW_ICON + specIcon + '.jpg" alt="' + specName + '">' : '';
+      var matchKey = null;
+      var available = specsByClass[cls.name] || [];
+      for (var a = 0; a < available.length; a++) {
+        if (SPECS[available[a]].spec === specName) { matchKey = available[a]; break; }
+      }
+      if (matchKey) {
+        html += '<div class="spec-option" onclick="event.stopPropagation();pickSpec(\'' + matchKey + '\')">' + iconImg + specName + '</div>';
+      } else {
+        html += '<div class="spec-option disabled">' + iconImg + specName + ' <span style="font-size:0.65rem;">(soon)</span></div>';
+      }
+    }
+    html += '</div>';
+
+    node.innerHTML = html;
+    ring.appendChild(node);
   }
 }
 
@@ -2629,6 +2788,14 @@ function doImport() {
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
+var resizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function() {
+    if (document.getElementById('specPickerOverlay').style.display !== 'none') buildSpecPicker();
+  }, 150);
+});
+
 function init() {
   buildSpecPicker();
 
