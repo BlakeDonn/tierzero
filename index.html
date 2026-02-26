@@ -176,6 +176,8 @@
     .weapon-mid .slot-expand, .weapon-bottom .slot-expand { font-size:0.6rem; }
     .weapon-bottom { display:flex; justify-content:center; gap:8px; margin-top:6px; }
     .weapon-bottom .gear-slot { max-width:220px; }
+    .weapon-bottom-pair .gear-slot { max-width:none; flex:1; }
+    .weapon-bottom-solo .gear-slot { max-width:320px; width:100%; }
 
     /* Gear slot card */
     .gear-slot { background:var(--bg-slot); border:1px solid var(--border-dim); border-radius:6px; border-left:3px solid var(--border-dim); transition:all 0.15s; cursor:pointer; overflow:hidden; }
@@ -222,7 +224,7 @@
     .spec-notes { font-size:0.78rem; color:var(--text-dim); text-align:left; margin-bottom:10px; line-height:1.6; }
 
     /* Stat rows */
-    .stat-summary { display:flex; flex-direction:column; gap:0; text-align:left; }
+    .stat-summary { display:flex; flex-direction:column; gap:0; text-align:left; align-items:center; }
     .stat-row {
       display:flex; align-items:center; gap:0;
       padding:5px 0;
@@ -4506,8 +4508,13 @@ function renderSheet() {
   // Determine which left/right/weapon slots exist for this spec
   var leftSlots = LEFT_SLOTS.filter(function (s) { return !!bis[s]; });
   var rightSlots = RIGHT_SLOTS.filter(function (s) { return !!bis[s]; });
-  var weaponMH = WEAPON_SLOTS_MH.filter(function (s) { return !!bis[s]; });
   var weaponBottom = WEAPON_SLOTS_BOTTOM.filter(function (s) { return !!bis[s]; });
+  var mhWithoutLibram = ["mainhand","offhand","wand"].filter(function (s) { return !!bis[s]; });
+  var libramGoesBottom = weaponBottom.length > 0 && mhWithoutLibram.length === 0 && !!bis.libram;
+  var weaponMH = WEAPON_SLOTS_MH.filter(function (s) {
+    if (s === 'libram' && libramGoesBottom) return false;
+    return !!bis[s];
+  });
 
   var renderSlotFn = sheetMode === "mygear" ? renderMyGearSlot : renderGearSlot;
 
@@ -4548,10 +4555,12 @@ function renderSheet() {
     centerHtml += '</div>';
   }
 
-  // 2H / wand / libram below weapons
+  // 2H below weapons — merge with libram on same row if no MH row
   if (weaponBottom.length) {
-    centerHtml += '<div class="weapon-bottom">';
+    var soloTwohand = !libramGoesBottom && weaponBottom.length === 1;
+    centerHtml += '<div class="weapon-bottom' + (libramGoesBottom ? ' weapon-bottom-pair' : '') + (soloTwohand ? ' weapon-bottom-solo' : '') + '">';
     for (var i = 0; i < weaponBottom.length; i++) centerHtml += renderSlotFn(weaponBottom[i]);
+    if (libramGoesBottom) centerHtml += renderSlotFn('libram');
     centerHtml += '</div>';
   }
 
