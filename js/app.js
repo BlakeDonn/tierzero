@@ -187,10 +187,20 @@ function parseCustomItem(val) {
 // Custom Item Stats Cache (fetched from Wowhead tooltip API)
 // ---------------------------------------------------------------------------
 var _customStatsCache = {};
+var CUSTOM_CACHE_VERSION = 2; // Bump to invalidate stale cached stats (v2: fixed rtg18 spell hit)
 (function() {
-  try { _customStatsCache = JSON.parse(localStorage.getItem("prebis-custom-stats") || "{}"); } catch(e) { _customStatsCache = {}; }
+  try {
+    var raw = JSON.parse(localStorage.getItem("prebis-custom-stats") || "{}");
+    if (raw._v === CUSTOM_CACHE_VERSION) {
+      _customStatsCache = raw;
+    } else {
+      _customStatsCache = { _v: CUSTOM_CACHE_VERSION };
+      localStorage.setItem("prebis-custom-stats", JSON.stringify(_customStatsCache));
+    }
+  } catch(e) { _customStatsCache = { _v: CUSTOM_CACHE_VERSION }; }
 })();
 function saveCustomStatsCache() {
+  _customStatsCache._v = CUSTOM_CACHE_VERSION;
   try { localStorage.setItem("prebis-custom-stats", JSON.stringify(_customStatsCache)); } catch(e) {}
 }
 function getCustomItemData(itemId) {
@@ -211,7 +221,11 @@ var WH_STAT_MAP = {
   3:'agi', 4:'str', 5:'int', 6:'spi', 7:'stam'
 };
 var WH_RTG_MAP = {
-  12:'def', 13:'dodge', 14:'parry', 15:'block', 21:'crit', 31:'hit', 32:'crit', 35:'res', 37:'exp'
+  12:'def', 13:'dodge', 14:'parry', 15:'block',
+  16:'hit', 17:'hit', 18:'hit', 31:'hit',
+  19:'crit', 20:'crit', 21:'crit', 32:'crit',
+  28:'haste', 29:'haste', 30:'haste', 36:'haste',
+  35:'res', 37:'expertise'
 };
 
 function parseWowheadStats(tooltipHtml) {

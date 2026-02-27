@@ -80,13 +80,19 @@ var ENCHANT_LINK_MAP = {
   3002:29192, // Glyph of Ferocity
   2997:29186, // Glyph of the Defender
   3003:29191, // Glyph of Power
-  // Shoulders (Inscriptions)
-  2982:28886, // Greater Inscription of Discipline
-  2986:28909, // Greater Inscription of the Oracle
-  2983:28888, // Greater Inscription of the Blade
-  2984:28889, // Greater Inscription of the Knight
-  2995:23545, // Greater Inscription of Vengeance
-  2996:23547, // Greater Inscription of the Orb
+  // Shoulders (Inscriptions — Greater = Exalted, Lesser = Honored)
+  2982:28886, // Greater Inscription of Discipline (Aldor Exalted)
+  2986:28909, // Greater Inscription of the Oracle (Aldor Exalted)
+  2983:28888, // Greater Inscription of the Blade (Aldor Exalted)
+  2984:28889, // Greater Inscription of the Knight (Aldor Exalted)
+  2995:23545, // Greater Inscription of Vengeance (Scryer Exalted)
+  2996:23547, // Greater Inscription of the Orb (Scryer Exalted)
+  2981:28881, // Inscription of Discipline (Aldor Honored)
+  2978:28885, // Inscription of Vengeance (Aldor Honored)
+  2979:28882, // Inscription of Warding (Aldor Honored)
+  2990:28903, // Inscription of the Orb (Scryer Honored)
+  2991:28907, // Inscription of the Blade (Scryer Honored)
+  2989:28904, // Inscription of the Oracle (Scryer Honored)
   // Back
   2621:25084, // Subtlety
   2938:34004, // Spell Penetration
@@ -145,7 +151,13 @@ var ENCHANTS = {
     {id:28888,name:"Greater Inscription of the Blade",stats:{ap:20,crit:15},src:"Aldor - Exalted"},
     {id:28889,name:"Greater Inscription of the Knight",stats:{def:15,dodge:10},src:"Aldor - Exalted"},
     {id:23545,name:"Greater Inscription of Vengeance",stats:{ap:30,crit:10},src:"Scryer - Exalted"},
-    {id:23547,name:"Greater Inscription of the Orb",stats:{sp:12,crit:15},src:"Scryer - Exalted"}
+    {id:23547,name:"Greater Inscription of the Orb",stats:{sp:12,crit:15},src:"Scryer - Exalted"},
+    {id:28881,name:"Inscription of Discipline",stats:{sp:15},src:"Aldor - Honored"},
+    {id:28885,name:"Inscription of Vengeance",stats:{ap:26},src:"Aldor - Honored"},
+    {id:28882,name:"Inscription of Warding",stats:{dodge:13},src:"Aldor - Honored"},
+    {id:28903,name:"Inscription of the Orb",stats:{crit:13},src:"Scryer - Honored"},
+    {id:28907,name:"Inscription of the Blade",stats:{crit:13},src:"Scryer - Honored"},
+    {id:28904,name:"Inscription of the Oracle",stats:{mp5:5},src:"Scryer - Honored"}
   ],
   back:[
     {id:25084,name:"Enchant Cloak - Subtlety",stats:{},src:"Enchanting",note:"-2% threat"},
