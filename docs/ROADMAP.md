@@ -21,6 +21,17 @@ These don't change UI much but are required by almost everything else.
 **Implemented:** Full `GEMS` database (meta, red, orange, yellow, blue, purple, green — rare + uncommon), `BIS_GEMS` per spec, `BIS_ENCHANTS` per spec, `GEM_FITS` socket matching, `ENCHANT_LINK_MAP`, gem/enchant UI in tracker, stat contributions included in totals.
 
 #### 0.3 — Expand Item Database & Fix BiS Rankings ✅ DONE
+#### 0.4 — AtlasLoot Source Cross-Reference 📋 PLANNED
+**What:** Cross-reference item drop sources against the AtlasLoot addon's data to fix source accuracy issues. AtlasLoot has curated loot tables mapping items to their exact dungeon/boss/source.
+**Why:** We have ~130 items with conflicting source strings across specs. AtlasLoot's loot tables are community-verified and highly accurate for dungeon/raid drops.
+**Plan:**
+- Pull AtlasLoot Classic TBC data from GitHub (LUA loot table files)
+- Parse loot tables to build `itemId → {instance, boss}` mapping
+- Cross-reference against our `src` strings to find mismatches
+- Auto-fix clear cases (wrong dungeon/boss name), flag ambiguous ones for manual review
+- Run after Phase 1 source normalization (already done, 442 replacements)
+**Source:** https://github.com/WoWClassicAtlasLoot or similar AtlasLoot Classic repos
+**Est:** Script + ~132 source fixes
 **What:** Re-audit and fix item[0] ranking for every spec. Fix hitCap values, stat inflation bugs, missing weapon slots. Re-rank all 27 specs against Wowhead/Icy Veins guides. Add alternatives to single-item slots.
 **Completed:**
 - Fixed hitCap for 6 specs (arcane-mage 164→76, ret-paladin 95→142, fury/arms-warrior 142→95, combat/assassination-rogue 363→64)
@@ -165,7 +176,25 @@ These don't change UI much but are required by almost everything else.
 **Depends on:** 3.1, optionally 2.1
 **Est:** ~130 lines JS + ~15 lines CSS
 
-#### 4.3 — Gold Cost Estimates 📋 PLANNED
+#### 4.3 — Content Profile Toggle (Dungeons / Heroics / Raids / PvP) 📋 PLANNED + NEEDS RESEARCH
+**What:** Toggle in Filter modal to switch the entire BiS list between content contexts. Each context has different stat caps and priorities.
+**Why:** Hit cap for raids (9%) is different from heroics (potentially less?) and dungeons (possibly none needed). A user gearing for Karazhan wants a completely different optimization than one running normal dungeons. PvP is an entirely different stat priority (resilience, stamina). One button press should re-sort the BiS list, adjust stat weights, and potentially swap tracked gear sets.
+**Research needed:**
+- What are the actual hit cap requirements per content tier? (Raids: 16% miss → need hit cap. Heroics: bosses are 72 so 6%? Normal dungeons: bosses are 70-71 so less?)
+- Do defense cap requirements change by content tier for tanks?
+- Do expertise soft caps differ?
+- What stat weight shifts make sense per profile? (e.g., raids value hit to cap >> all, dungeons may value throughput more freely)
+**Plan (tentative, pending research):**
+- `CONTENT_PROFILES`: `{dungeons: {hitCap:X, defCap:Y, weights:...}, heroics: {...}, raids: {...}, pvp: {...}}`
+- Profile selector in Filter modal: `[Dungeons] [Heroics] [Raids] [PvP]` (PvP greyed out initially)
+- `getActiveHitCap()` / `getActiveDefCap()` reads profile instead of flat spec value
+- When profile changes: re-score all items via 3.1 weights, re-sort slot arrays, update stat panel caps
+- Per-profile tracked gear sets: `prebis-tracker-{spec}-{profile}` so swapping profiles swaps your gear too
+- Stat panel shows cap for active profile: "Hit: 76/76 (Heroic)" or "Hit: 142/142 (Raid)"
+**Depends on:** 3.1 (Stat Weights — required for re-ranking by profile)
+**Est:** ~150 lines JS + ~10 lines CSS (excluding research/data gathering)
+
+#### 4.4 — Gold Cost Estimates 📋 PLANNED
 **What:** Show gold cost for BoE items, crafting materials, and total "cost to BiS" using Auctionator price data.
 **Plan:**
 - `isGoldPurchasable(item)`: detect BoE/crafted items via `src` string parsing
@@ -210,7 +239,7 @@ These don't change UI much but are required by almost everything else.
 | ~~1~~ | ~~0.1 School-specific damage~~ | ✅ Done | — |
 | ~~2~~ | ~~0.2 Gems & enchants~~ | ✅ Done | — |
 | ~~3~~ | ~~0.3 Item database & re-ranking~~ | ✅ Done | — |
-| 4 | 1.1+1.2+1.3 Character Profile & Filtering | 📋 Planned | ~170 lines |
+| 4 | 1.1+1.2+1.3 Character Profile & Filtering | 🔧 In Progress | ~170 lines |
 | 5 | 5.1 Shareable URLs | 📋 Planned | ~110 lines |
 | 6 | 2.1 Addon Rep Tracking | 📋 Planned | ~125 lines |
 | 7 | 3.1 Stat Weights & Gear Scoring | 📋 Planned | ~205 lines |
@@ -219,6 +248,7 @@ These don't change UI much but are required by almost everything else.
 | 10 | 2.3 Full Inventory Persistence | 📋 Planned | ~60 lines |
 | 11 | 2.2 Auctionator Integration | 📋 Planned | ~95 lines |
 | 12 | 4.1 Gear Optimizer | 📋 Planned | ~200 lines |
-| 13 | 4.2 Session Planner | 📋 Planned | ~145 lines |
-| 14 | 4.3 Gold Cost Estimates | 📋 Planned | ~60 lines |
-| 15 | 5.2 Export as Image/Text | 📋 Planned | ~125 lines |
+| 13 | 4.3 Content Profile Toggle | 📋 Planned + Research | ~150 lines |
+| 14 | 4.2 Session Planner | 📋 Planned | ~145 lines |
+| 15 | 4.4 Gold Cost Estimates | 📋 Planned | ~60 lines |
+| 16 | 5.2 Export as Image/Text | 📋 Planned | ~125 lines |

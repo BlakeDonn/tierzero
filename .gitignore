@@ -1,0 +1,8 @@
+# Pipeline data (generated/cached)
+_data/
+_spec-output/
+_item-additions/
+_item-additions-v2/
+
+# Backups
+*.bak
