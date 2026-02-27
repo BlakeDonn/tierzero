@@ -420,8 +420,40 @@
     .sheet-toggle-btn { font-size:0.82rem; font-weight:500; padding:8px 24px; background:transparent; color:var(--text-dim); border:none; cursor:pointer; transition:all 0.2s; }
     .sheet-toggle-btn:hover { color:var(--text-gold); }
     .sheet-toggle-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-bottom:2px solid var(--border-gold); }
+    .ranking-toggle { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px; }
+    .ranking-label { font-size:0.7rem; color:var(--text-dim); font-family:'Roboto',sans-serif; }
+    .ranking-btn { font-size:0.7rem; font-weight:500; padding:3px 10px; background:var(--bg-panel); color:var(--text-dim); border:1px solid var(--border-dim); border-radius:4px; cursor:pointer; transition:all 0.2s; font-family:'Roboto',sans-serif; }
+    .ranking-btn:hover { color:var(--text-gold); border-color:var(--border-gold); }
+    .ranking-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-color:var(--border-gold); }
+    .alt-rank-label { font-size:0.6rem; font-weight:600; padding:2px 6px; border-radius:3px; flex-shrink:0; white-space:nowrap; font-family:'Roboto',sans-serif; min-width:42px; text-align:center; box-sizing:border-box; }
+    .alt-rank-label.rank-bis { background:rgba(200,170,110,0.25); color:var(--border-gold); }
+    .alt-rank-label.rank-option { background:rgba(0,112,221,0.15); color:#4db8ff; }
+    .alt-rank-label.rank-optional { background:rgba(30,200,30,0.12); color:#1eff00; }
+    .alt-rank-label.rank-unranked { background:transparent; color:var(--text-dim); font-style:italic; opacity:0.6; }
     .mygear-empty { display:flex; align-items:center; justify-content:center; min-height:24px; font-size:0.75rem; color:#ff5555; font-style:italic; }
     .mygear-slot.quality-none { border-left-color:#555; }
+
+    /* ===== Gear Score Badges ===== */
+    .alt-score { font-size:0.6rem; color:var(--text-dim); font-family:'Roboto',sans-serif; margin-left:auto; padding:2px 6px; white-space:nowrap; opacity:0.8; }
+    .alt-score.delta-pos { color:var(--uncommon); }
+    .alt-score.delta-neg { color:#ff5555; }
+    .slot-score { font-size:0.6rem; color:var(--text-dim); margin-left:6px; opacity:0.7; }
+    .total-score { font-size:0.7rem; color:var(--text-gold); text-align:center; margin:4px 0; font-family:'Roboto',sans-serif; opacity:0.9; }
+
+    /* ===== My Gear — Owned Items ===== */
+    .owned-alt-item { cursor:pointer; }
+    .owned-alt-item:hover { background:rgba(30,255,0,0.04); }
+    .owned-rank { background:rgba(30,255,0,0.08); border-color:rgba(30,255,0,0.25); color:var(--uncommon); font-size:0.7rem; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .owned-empty { font-size:0.75rem; color:var(--text-dim); padding:10px 16px; font-style:italic; }
+    .owned-divider { border-top:1px solid var(--border-dim); margin:4px 0; }
+    .find-upgrades-btn { display:block; width:100%; padding:8px; background:rgba(0,112,221,0.08); border:none; border-top:1px solid var(--border-dim); color:var(--rare); font-size:0.75rem; cursor:pointer; transition:all 0.15s; }
+    .find-upgrades-btn:hover { background:rgba(0,112,221,0.15); color:#5eaadd; }
+    .upgrades-section { border-top:none; }
+
+    /* ===== Filter Modal — Checkbox ===== */
+    .filter-checkbox { display:flex; align-items:center; gap:8px; font-size:0.82rem; color:var(--text-gold); cursor:pointer; padding:4px 0; }
+    .filter-checkbox input[type="checkbox"] { accent-color:var(--border-gold); width:16px; height:16px; cursor:pointer; }
+    .filter-hint { font-size:0.7rem; color:var(--text-dim); font-weight:400; }
 
     /* ===== GEAR TRACKER — Typeahead ===== */
     .typeahead-wrap { flex:1; position:relative; }
@@ -572,6 +604,26 @@
     .raid-slot-empty { font-size:0.78rem; color:#ff5555; font-style:italic; }
     .raid-slot-upgrade { font-size:0.72rem; color:var(--text-dim); margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05); }
     .raid-actions { display:flex; justify-content:center; padding:8px 0; }
+
+    /* Inline Optimizer — Swap Indicators */
+    .gear-slot.swap-pending { border-color:rgba(200,170,110,0.5); box-shadow:0 0 8px rgba(200,170,110,0.15); }
+    .swap-suggest { display:flex; align-items:center; gap:8px; padding:6px 10px; border-top:1px dashed var(--border-gold); background:rgba(200,170,110,0.04); }
+    .swap-arrow { color:var(--border-gold); font-size:0.8rem; flex-shrink:0; }
+    .swap-item { flex:1; min-width:0; }
+    .swap-item .item-link { font-size:0.78rem; }
+    .swap-item .ge-row { margin-top:2px; }
+    .swap-actions { display:flex; gap:4px; flex-shrink:0; }
+    .swap-accept, .swap-reject { width:22px; height:22px; border-radius:50%; border:1px solid var(--border-dim); background:var(--bg-dark); cursor:pointer; font-size:0.65rem; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+    .swap-accept { color:#5cdc78; }
+    .swap-accept:hover { background:rgba(30,255,0,0.12); border-color:#5cdc78; }
+    .swap-reject { color:#ff5555; }
+    .swap-reject:hover { background:rgba(255,60,60,0.08); border-color:#ff5555; }
+    .swap-banner { display:flex; align-items:center; gap:8px; justify-content:center; padding:8px 14px; background:rgba(200,170,110,0.08); border:1px solid var(--border-gold); border-radius:8px; margin-bottom:6px; }
+    .swap-banner-text { font-size:0.78rem; color:var(--text-gold); font-family:'Cinzel',serif; }
+    .swap-apply-all { font-size:0.72rem; padding:4px 12px; border-radius:6px; cursor:pointer; border:1px solid var(--border-gold); background:rgba(200,170,110,0.15); color:var(--text-gold); transition:all 0.15s; }
+    .swap-apply-all:hover { background:rgba(200,170,110,0.25); }
+    .swap-dismiss-all { font-size:0.72rem; padding:4px 12px; border-radius:6px; cursor:pointer; border:1px solid var(--border-dim); background:var(--bg-panel); color:var(--text-dim); transition:all 0.15s; }
+    .swap-dismiss-all:hover { border-color:var(--border-gold); color:var(--text-gold); }
 
     /* Double-column stat layout for many stats */
     .stat-summary.two-col { display:grid; grid-template-columns:auto auto; gap:4px 20px; justify-content:center; }

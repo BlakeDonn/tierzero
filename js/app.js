@@ -5,6 +5,48 @@
 let currentSpec = localStorage.getItem("prebis-spec") || "";
 let currentView = "sheet"; // "sheet" | "routes" | "tracker"
 let sheetMode = "bis"; // "bis" | "mygear"
+let rankingSource = localStorage.getItem("prebis-ranking-source") || "tierzero";
+var pendingSwaps = null;  // { slotKey: { item, gems[], enchantId, score } } or null
+var optimizerMessage = ""; // transient message shown once then cleared
+
+// ---------------------------------------------------------------------------
+// Budget Mode
+// ---------------------------------------------------------------------------
+function isBudgetMode() {
+  return localStorage.getItem("prebis-budget-mode") === "true";
+}
+
+function toggleBudgetMode() {
+  var cur = isBudgetMode();
+  if (cur) localStorage.removeItem("prebis-budget-mode");
+  else localStorage.setItem("prebis-budget-mode", "true");
+  // Clear optimizer results since they used old settings
+  pendingSwaps = null;
+  showFilterModal();
+  renderCurrentView();
+}
+
+function getActiveBisGems(specSlug) {
+  var base = BIS_GEMS[specSlug];
+  if (!base || !isBudgetMode() || typeof BUDGET_GEM_MAP === "undefined") return base;
+  var result = {};
+  var keys = Object.keys(base);
+  for (var i = 0; i < keys.length; i++) {
+    var gemId = base[keys[i]];
+    result[keys[i]] = BUDGET_GEM_MAP[gemId] || gemId;
+  }
+  return result;
+}
+
+function getActiveBisEnchant(specSlug, slotKey) {
+  var bisEnchants = BIS_ENCHANTS[specSlug];
+  if (!bisEnchants) return null;
+  var enchId = bisEnchants[slotKey];
+  if (!enchId) return null;
+  if (!isBudgetMode() || typeof BUDGET_ENCHANT_MAP === "undefined") return enchId;
+  if (!(enchId in BUDGET_ENCHANT_MAP)) return enchId;
+  return BUDGET_ENCHANT_MAP[enchId]; // null means skip
+}
 
 // ---------------------------------------------------------------------------
 // Profession Filters
@@ -132,6 +174,12 @@ function showFilterModal() {
     html += '<button class="filter-btn' + (isActive ? " active" : "") + '" onclick="toggleFilterProf(\'' + prof + '\')">' + prof + '</button>';
   }
   html += '</div></div>';
+
+  // Optimizer — Budget Mode
+  html += '<div class="filter-section">';
+  html += '<div class="filter-label">Optimizer</div>';
+  html += '<label class="filter-checkbox"><input type="checkbox"' + (isBudgetMode() ? ' checked' : '') + ' onchange="toggleBudgetMode()"> Budget Mode <span class="filter-hint">— Uncommon gems &amp; Honored enchants</span></label>';
+  html += '</div>';
 
   html += '<div class="import-btn-row" style="margin-top:16px;">';
   html += '<button class="import-primary" onclick="closeFilterModal()">Done</button>';
@@ -520,6 +568,7 @@ function buildSpecPicker() {
 }
 
 function pickSpec(spec) {
+  pendingSwaps = null;
   currentSpec = spec;
   localStorage.setItem("prebis-spec", spec);
   document.getElementById("specPickerOverlay").style.display = "none";
@@ -589,8 +638,137 @@ function specSlots() {
 }
 
 function bisItem(slotKey) {
-  var items = specSlots()[slotKey];
+  var items = getOrderedItems(slotKey);
   return items && items.length ? items[0] : null; // rank 1
+}
+
+function setRankingSource(src) {
+  rankingSource = src;
+  localStorage.setItem("prebis-ranking-source", src);
+  renderCurrentView();
+}
+
+function hasRankingData(specSlug, source) {
+  if (typeof RANKINGS === "undefined") return false;
+  return !!(RANKINGS[source] && RANKINGS[source][specSlug]);
+}
+
+function getOrderedItems(slotKey) {
+  var items = specSlots()[slotKey];
+  if (!items || !items.length) return items;
+  if (rankingSource === "tierzero") return items;
+  if (!hasRankingData(currentSpec, rankingSource)) return items;
+
+  var rankData = RANKINGS[rankingSource][currentSpec][slotKey];
+  if (!rankData || !rankData.length) return items;
+
+  // Build ID→rank-index map from ranking data
+  var rankOrder = {};
+  for (var i = 0; i < rankData.length; i++) {
+    rankOrder[rankData[i].id] = i;
+  }
+
+  // Ranked items first (in Wowhead's order), then unranked after
+  var ranked = [];
+  var unranked = [];
+  for (var j = 0; j < items.length; j++) {
+    if (rankOrder[items[j].id] !== undefined) {
+      ranked.push({ item: items[j], order: rankOrder[items[j].id] });
+    } else {
+      unranked.push(items[j]);
+    }
+  }
+  ranked.sort(function(a, b) { return a.order - b.order; });
+  var result = ranked.map(function(r) { return r.item; });
+  return result.concat(unranked);
+}
+
+function getRankLabel(slotKey, itemId) {
+  if (rankingSource === "tierzero" || !hasRankingData(currentSpec, rankingSource)) return null;
+  var rankData = RANKINGS[rankingSource][currentSpec][slotKey];
+  if (!rankData) return null;
+  for (var i = 0; i < rankData.length; i++) {
+    if (rankData[i].id === itemId) return rankData[i].rank;
+  }
+  return "Not ranked";
+}
+
+// ---------------------------------------------------------------------------
+// Stat Weights & Gear Scoring
+// ---------------------------------------------------------------------------
+function hasStatWeights(specSlug) {
+  return typeof STAT_WEIGHTS !== "undefined" && !!STAT_WEIGHTS[specSlug];
+}
+
+function capAwareWeight(statKey, spec, weights) {
+  // Returns effective per-point weight for hit/def based on cap
+  var cap = statKey === "hit" ? spec.hitCap : spec.defCap;
+  if (!cap) return weights[statKey] || 0; // no cap (healers) — use flat weight
+  // Find primary weight (max weight in the set, excluding 0-sentinel cap stats)
+  var primaryWeight = 0;
+  var wk = Object.keys(weights);
+  for (var i = 0; i < wk.length; i++) {
+    if (wk[i] !== "hit" && wk[i] !== "def" && weights[wk[i]] > primaryWeight) {
+      primaryWeight = weights[wk[i]];
+    }
+  }
+  return primaryWeight * 1.5;
+}
+
+function itemScore(item, specSlug) {
+  if (!item || !item.stats) return 0;
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return 0;
+  var spec = SPECS[specSlug];
+  if (!spec) return 0;
+  var score = 0;
+  var keys = Object.keys(item.stats);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var v = item.stats[k];
+    if (k === "hit" || k === "def") {
+      score += capAwareWeight(k, spec, weights) * v;
+    } else {
+      score += (weights[k] || 0) * v;
+    }
+  }
+  return Math.round(score * 10) / 10;
+}
+
+function computeBisScore() {
+  var spec = specData();
+  var specSlug = localStorage.getItem("prebis-spec");
+  if (!hasStatWeights(specSlug)) return 0;
+  var slotKeys = Object.keys(spec.slots);
+  var hasMainhand = !!spec.slots["mainhand"];
+  var hasTwohand = !!spec.slots["twohand"];
+  var total = 0;
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    if (sk === "twohand" && hasMainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && hasTwohand && !hasMainhand) continue;
+    total += itemScore(bisItem(sk), specSlug);
+  }
+  return Math.round(total * 10) / 10;
+}
+
+function computeTrackerScore() {
+  var spec = specData();
+  var specSlug = localStorage.getItem("prebis-spec");
+  if (!hasStatWeights(specSlug)) return 0;
+  var slotKeys = Object.keys(spec.slots);
+  var tracked = loadTracker();
+  var hasTrackedMainhand = tracked["mainhand"] !== undefined && tracked["mainhand"] !== "";
+  var hasTrackedTwohand = tracked["twohand"] !== undefined && tracked["twohand"] !== "";
+  var total = 0;
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    if (sk === "twohand" && hasTrackedMainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && hasTrackedTwohand && !hasTrackedMainhand) continue;
+    var item = getTrackedItem(sk);
+    if (item) total += itemScore(item, specSlug);
+  }
+  return Math.round(total * 10) / 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +802,15 @@ function loadMoreAlts(btn) {
   }
   btn.remove();
   refreshWowheadLinks();
+}
+
+function toggleUpgrades(btn) {
+  var section = btn.nextElementSibling;
+  if (!section) return;
+  var showing = section.style.display !== 'none';
+  section.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? btn.textContent.replace('Hide', 'Find') : btn.textContent.replace('Find', 'Hide');
+  if (!showing) refreshWowheadLinks();
 }
 
 function gemTooltipText(gem) {
@@ -697,7 +884,7 @@ function renderBisGemsEnchants(slotKey, item) {
 }
 
 function renderGearSlot(slotKey) {
-  var allItems = specSlots()[slotKey];
+  var allItems = getOrderedItems(slotKey);
   if (!allItems || !allItems.length) return "";
   // Filter items but always keep the #1 BiS
   var items = [allItems[0]];
@@ -708,13 +895,16 @@ function renderGearSlot(slotKey) {
   var label = SLOT_LABELS[slotKey] || slotKey;
   var qc = qualityClass(top.q);
   var count = items.length;
+  var useRankLabels = rankingSource !== "tierzero" && hasRankingData(currentSpec, rankingSource);
 
   var html = '<div class="gear-slot quality-' + qc + '" onclick="toggleSlot(this)">';
   html += '<div class="slot-header">';
   html += '<div class="slot-bis">';
   html += '<div class="slot-label">' + label + '</div>';
   html += '<div class="item-link">' + itemLink(top) + '</div>';
-  html += '<div class="item-src">' + top.src + ' ' + sourceTag(top.src) + '</div>';
+  html += '<div class="item-src">' + top.src + ' ' + sourceTag(top.src);
+  if (hasStatWeights(currentSpec)) html += ' <span class="slot-score">' + itemScore(top, currentSpec) + '</span>';
+  html += '</div>';
   html += renderBisGemsEnchants(slotKey, top);
   html += '</div>';
   if (count > 1) html += '<div class="slot-expand">' + count + ' &#9660;</div>';
@@ -722,17 +912,31 @@ function renderGearSlot(slotKey) {
 
   if (count > 1) {
     var maxVisible = 5;
+    var topScore = hasStatWeights(currentSpec) ? itemScore(top, currentSpec) : 0;
     html += '<div class="slot-alts">';
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
       var hidden = i >= maxVisible ? ' style="display:none" data-alt-hidden' : '';
       html += '<div class="alt-item"' + hidden + '>';
-      html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
+      if (useRankLabels) {
+        var rl = getRankLabel(slotKey, it.id) || "Not ranked";
+        var rlClass = rankLabelClass(rl);
+        html += '<div class="alt-rank-label ' + rlClass + '">' + rl + '</div>';
+      } else {
+        var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+        html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
+      }
       html += '<div class="alt-info">';
       html += '<div class="alt-name">' + itemLink(it) + '</div>';
       html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
-      html += '</div></div>';
+      html += '</div>';
+      if (hasStatWeights(currentSpec)) {
+        var delta = itemScore(it, currentSpec) - topScore;
+        var sign = delta > 0 ? '+' : '';
+        var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
+        html += '<div class="alt-score ' + cls + '">' + sign + delta.toFixed(1) + '</div>';
+      }
+      html += '</div>';
     }
     if (items.length > maxVisible) {
       html += '<button class="load-more-btn" onclick="event.stopPropagation();loadMoreAlts(this)">Show ' + (items.length - maxVisible) + ' more</button>';
@@ -741,6 +945,15 @@ function renderGearSlot(slotKey) {
   }
   html += '</div>';
   return html;
+}
+
+function rankLabelClass(label) {
+  if (!label) return 'rank-unranked';
+  var l = label.toLowerCase();
+  if (l === 'bis') return 'rank-bis';
+  if (l === 'option' || l === 'optional') return 'rank-option';
+  if (l === 'not ranked') return 'rank-unranked';
+  return 'rank-optional';
 }
 
 function addStats(target, source) {
@@ -1164,7 +1377,33 @@ function renderMyGearSlot(slotKey) {
     hasGeData = (trackedItem.sockets && trackedItem.sockets.length) || (enchListCheck && enchListCheck.length) || loadTrackerEnchants()[slotKey];
   }
 
-  var html = '<div class="gear-slot mygear-slot quality-' + qc + '" onclick="toggleSlot(this)">';
+  // Inventory-based owned items
+  var inv = loadInventory();
+  var tracked = loadTracker();
+  var ownedMatches = [];
+  var currentEquippedId = hasItem ? trackedItem.id : null;
+  if (inv) {
+    var allInv = (inv.bags || []).concat(inv.bank || []);
+    ownedMatches = findInventoryMatches(slotKey, spec, allInv, tracked);
+    // Filter out the currently equipped item
+    if (currentEquippedId) {
+      ownedMatches = ownedMatches.filter(function(m) { return m.item.id !== currentEquippedId; });
+    }
+  }
+  var hasInventory = inv && (inv.bags && inv.bags.length || inv.bank && inv.bank.length);
+
+  // Upgrade count (BiS items ranked higher than equipped)
+  var upgradeCount = items.length;
+  if (hasItem && !trackedItem.isCustom) {
+    var curIdx = parseInt(tracked[slotKey], 10);
+    upgradeCount = curIdx;
+  }
+
+  // Expansion count: owned items if inventory exists, else upgrade count
+  var expandCount = hasInventory ? ownedMatches.length : upgradeCount;
+
+  var hasPendingSwap = pendingSwaps && pendingSwaps[slotKey];
+  var html = '<div class="gear-slot mygear-slot quality-' + qc + (hasPendingSwap ? ' swap-pending' : '') + '" onclick="toggleSlot(this)">';
   html += '<div class="slot-header">';
   html += '<div class="slot-bis">';
   html += '<div class="slot-label">' + label;
@@ -1185,21 +1424,82 @@ function renderMyGearSlot(slotKey) {
   }
   html += '</div>';
 
-  // For custom items, all BiS items are upgrades. For BiS items, items ranked higher are upgrades.
-  var upgradeCount = items.length; // default: all items are upgrades
-  if (hasItem && !trackedItem.isCustom) {
-    var tracked = loadTracker();
-    var curIdx = parseInt(tracked[slotKey], 10);
-    upgradeCount = curIdx; // items before current index are upgrades
+  if (hasInventory) {
+    // Show owned count or upgrade count when no owned items
+    if (ownedMatches.length > 0) {
+      html += '<div class="slot-expand">' + ownedMatches.length + ' owned &#9660;</div>';
+    } else if (upgradeCount > 0) {
+      html += '<div class="slot-expand">' + upgradeCount + ' &#9660;</div>';
+    }
+  } else {
+    if (upgradeCount > 0) html += '<div class="slot-expand">' + upgradeCount + ' &#9660;</div>';
   }
-  if (upgradeCount > 0) html += '<div class="slot-expand">' + upgradeCount + ' &#9660;</div>';
   html += '</div>';
 
-  // Show upgrade options in dropdown
-  if (upgradeCount > 0) {
+  // Swap suggestion (optimizer)
+  if (hasPendingSwap) html += renderSwapSuggestion(slotKey);
+
+  // Expansion content
+  if (hasInventory) {
+    // -- Owned items section --
+    var currentScore = hasItem && hasStatWeights(currentSpec) ? itemScore(trackedItem, currentSpec) : 0;
+    var maxOwnedVisible = 5;
+    html += '<div class="slot-alts">';
+    if (ownedMatches.length > 0) {
+      for (var i = 0; i < ownedMatches.length; i++) {
+        var m = ownedMatches[i];
+        var it = m.item;
+        var hidden = i >= maxOwnedVisible ? ' style="display:none" data-alt-hidden' : '';
+        html += '<div class="alt-item owned-alt-item" onclick="event.stopPropagation();trackItem(\'' + slotKey + '\',' + m.specIndex + ')"' + hidden + '>';
+        html += '<div class="alt-rank owned-rank">&#128092;</div>';
+        html += '<div class="alt-info">';
+        html += '<div class="alt-name">' + itemLink(it) + '</div>';
+        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+        html += '</div>';
+        if (hasStatWeights(currentSpec)) {
+          var delta = itemScore(it, currentSpec) - currentScore;
+          var sign = delta > 0 ? '+' : '';
+          var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
+          html += '<div class="alt-score ' + cls + '">' + sign + delta.toFixed(1) + '</div>';
+        }
+        html += '</div>';
+      }
+      if (ownedMatches.length > maxOwnedVisible) {
+        html += '<button class="load-more-btn" onclick="event.stopPropagation();loadMoreAlts(this)">Show ' + (ownedMatches.length - maxOwnedVisible) + ' more</button>';
+      }
+    } else {
+      html += '<div class="owned-empty">No items in bags for this slot</div>';
+    }
+
+    // -- Find Upgrades toggle --
+    if (upgradeCount > 0) {
+      html += '<button class="find-upgrades-btn" onclick="event.stopPropagation();toggleUpgrades(this)">Find Upgrades (' + upgradeCount + ')</button>';
+      html += '<div class="upgrades-section" style="display:none">';
+      html += '<div class="owned-divider"></div>';
+      var limit = (hasItem && !trackedItem.isCustom) ? parseInt(tracked[slotKey], 10) : items.length;
+      var maxUpgradeVisible = 5;
+      for (var i = 0; i < limit; i++) {
+        var it = items[i];
+        var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+        var hiddenU = i >= maxUpgradeVisible ? ' style="display:none" data-alt-hidden' : '';
+        html += '<div class="alt-item"' + hiddenU + '>';
+        html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
+        html += '<div class="alt-info">';
+        html += '<div class="alt-name">' + itemLink(it) + '</div>';
+        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+        html += '</div></div>';
+      }
+      if (limit > maxUpgradeVisible) {
+        html += '<button class="load-more-btn" onclick="event.stopPropagation();loadMoreAlts(this)">Show ' + (limit - maxUpgradeVisible) + ' more</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  } else if (upgradeCount > 0) {
+    // No inventory — fall back to original behavior (BiS upgrades only)
     var maxVisible = 5;
     html += '<div class="slot-alts">';
-    var limit = (hasItem && !trackedItem.isCustom) ? parseInt(loadTracker()[slotKey], 10) : items.length;
+    var limit = (hasItem && !trackedItem.isCustom) ? parseInt(tracked[slotKey], 10) : items.length;
     for (var i = 0; i < limit; i++) {
       var it = items[i];
       var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
@@ -1231,10 +1531,20 @@ function renderSheet() {
   toggleHtml += '<button class="sheet-toggle-btn' + (sheetMode === "bis" ? " active" : "") + '" onclick="setSheetMode(\'bis\')">BiS List</button>';
   toggleHtml += '<button class="sheet-toggle-btn' + (sheetMode === "mygear" ? " active" : "") + '" onclick="setSheetMode(\'mygear\')">My Gear</button>';
   toggleHtml += '</div>';
+  if (sheetMode === "bis" && hasRankingData(currentSpec, "wowhead")) {
+    toggleHtml += '<div class="ranking-toggle">';
+    toggleHtml += '<button class="ranking-btn' + (rankingSource === "tierzero" ? " active" : "") + '" onclick="setRankingSource(\'tierzero\')">Tier Zero</button>';
+    toggleHtml += '<button class="ranking-btn' + (rankingSource === "wowhead" ? " active" : "") + '" onclick="setRankingSource(\'wowhead\')">Wowhead</button>';
+    toggleHtml += '</div>';
+  }
   toggleHtml += '<div style="display:flex;gap:6px;justify-content:center;margin-top:6px;">';
   toggleHtml += '<button class="import-icon-btn" onclick="showFilterModal()" title="Filter items">&#9881; Filters</button>';
   if (sheetMode === "mygear") {
     toggleHtml += '<button class="import-icon-btn" onclick="showImportModal()" title="Import from Addon">&#8681; Import</button>';
+    if (hasStatWeights(currentSpec) && loadInventory()) {
+      var optLabel = isBudgetMode() ? '&#9889; Optimize (Budget)' : '&#9889; Optimize';
+      toggleHtml += '<button class="import-icon-btn" onclick="runOptimizerInline()" title="Optimize gear from inventory">' + optLabel + '</button>';
+    }
   }
   toggleHtml += '</div>';
 
@@ -1265,17 +1575,45 @@ function renderSheet() {
   var centerHtml = '<div class="center-column">';
   centerHtml += toggleHtml;
 
+  // Swap banner or optimizer message
+  if (sheetMode === "mygear") {
+    if (pendingSwaps && Object.keys(pendingSwaps).length > 0) {
+      var swapCount = Object.keys(pendingSwaps).length;
+      centerHtml += '<div class="swap-banner">';
+      centerHtml += '<div class="swap-banner-text">' + swapCount + ' optimized swap' + (swapCount > 1 ? 's' : '') + '</div>';
+      centerHtml += '<button class="swap-apply-all" onclick="applyAllSwaps()">Apply All</button>';
+      centerHtml += '<button class="swap-dismiss-all" onclick="dismissAllSwaps()">Dismiss</button>';
+      centerHtml += '</div>';
+    } else if (optimizerMessage) {
+      centerHtml += '<div class="swap-banner"><div class="swap-banner-text">' + optimizerMessage + '</div></div>';
+      optimizerMessage = "";
+    }
+  }
+
   if (sheetMode === "mygear") {
     var myStats = getTrackerStats();
+    var myScoreHtml = '';
+    if (hasStatWeights(currentSpec)) {
+      var myScore = computeTrackerScore();
+      var bisScore = computeBisScore();
+      var pct = bisScore > 0 ? (myScore / bisScore * 100).toFixed(1) : '0.0';
+      myScoreHtml = '<div class="total-score">Your Score: ' + myScore.toLocaleString() + ' / BiS: ' + bisScore.toLocaleString() + ' (' + pct + '%)</div>';
+    }
     centerHtml += '<div class="character-model compact">' +
       '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
       '<div class="stat-subtitle">compared to bis</div>' +
+      myScoreHtml +
       renderStatSummaryVsBis(myStats, bisStats) +
       '</div>';
   } else {
+    var bisScoreHtml = '';
+    if (hasStatWeights(currentSpec)) {
+      bisScoreHtml = '<div class="total-score">Gear Score: ' + computeBisScore().toLocaleString() + '</div>';
+    }
     centerHtml += '<div class="character-model compact">' +
       '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
       (spec.notes ? '<div class="spec-notes">' + spec.notes + '</div>' : '') +
+      bisScoreHtml +
       '<div style="font-size:0.65rem;color:var(--text-dim);margin-bottom:4px;opacity:0.7;">Stats include gems &amp; enchants</div>' +
       renderStatSummary(bisStats) +
       '</div>';
@@ -2634,6 +2972,828 @@ function loadInventory() {
   } catch(e) { return null; }
 }
 
+// ---------------------------------------------------------------------------
+// Gear Set Optimizer — 1D DP on hit/def cap
+// ---------------------------------------------------------------------------
+var lastOptimizerResult = null;
+
+// Step 1: Find all SPECS items the player owns for a given slot
+function findInventoryMatches(slotKey, spec, allInv, tracked) {
+  var slotItems = spec.slots[slotKey];
+  if (!slotItems) return [];
+  var matches = [];
+  for (var i = 0; i < slotItems.length; i++) {
+    var item = slotItems[i];
+    var owned = false;
+    for (var j = 0; j < allInv.length; j++) {
+      if (allInv[j].id === item.id) { owned = true; break; }
+    }
+    // Also check tracker (equipped items)
+    if (!owned) {
+      var tv = tracked[slotKey];
+      if (tv !== undefined && tv !== "") {
+        var str = String(tv);
+        if (str.indexOf("c:") !== 0 && parseInt(str, 10) === i) owned = true;
+      }
+    }
+    if (owned) matches.push({ item: item, specIndex: i });
+  }
+  return matches;
+}
+
+// Step 2: Gem variant generator
+function buildBisGemVariant(item, bisGems) {
+  var stats = {};
+  var gems = [];
+  var allMatch = true;
+  if (!item.sockets) return { stats: stats, gems: gems, bonusActive: false };
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    var gemId = bisGems[sc];
+    var gem = gemId ? GEMS[gemId] : null;
+    if (gem) {
+      gems.push(gemId);
+      addStats(stats, gem.stats);
+      if (!gemFits(gem.color, sc)) allMatch = false;
+    } else {
+      gems.push(0);
+      allMatch = false;
+    }
+  }
+  var bonusActive = allMatch && item.socketBonus;
+  if (bonusActive) addStats(stats, item.socketBonus);
+  return { stats: stats, gems: gems, bonusActive: bonusActive };
+}
+
+function getCapGemId(socketColor, capKey) {
+  // Return best hit or def gem that fits the socket
+  if (capKey === "hit") {
+    // Rigid Dawnstone (yellow, +8 hit) fits yellow sockets
+    if (gemFits("yellow", socketColor)) return 24053;
+    // Veiled Noble Topaz (orange, +5sp +4hit) fits red sockets
+    if (gemFits("orange", socketColor)) return 31867;
+    // For blue sockets — no pure hit blue gem; use purple Glowing Nightseye (sp+stam) — no hit
+    // Actually no hit gem fits blue. Return 0 (can't put hit gem here).
+    return 0;
+  }
+  if (capKey === "def") {
+    // Enduring Talasite (green, +4def +6stam) fits blue sockets
+    if (gemFits("green", socketColor)) return 24065;
+    // Thick Golden Draenite (yellow, +6def) fits yellow sockets
+    if (gemFits("yellow", socketColor)) return 23115;
+    return 0;
+  }
+  return 0;
+}
+
+function buildCapGemVariant(item, bisGems, capKey) {
+  var stats = {};
+  var gems = [];
+  var allMatch = true;
+  if (!item.sockets) return null;
+  var hasCap = false;
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    if (sc === "meta") {
+      var metaId = bisGems.meta;
+      var meta = metaId ? GEMS[metaId] : null;
+      gems.push(metaId || 0);
+      if (meta) addStats(stats, meta.stats);
+      if (!meta || !gemFits(meta.color, sc)) allMatch = false;
+      continue;
+    }
+    var capGemId = getCapGemId(sc, capKey);
+    if (capGemId) {
+      gems.push(capGemId);
+      var capGem = GEMS[capGemId];
+      if (capGem) addStats(stats, capGem.stats);
+      if (!gemFits(capGem.color, sc)) allMatch = false;
+      hasCap = true;
+    } else {
+      // Fallback to BiS gem
+      var bisId = bisGems[sc];
+      var bisGem = bisId ? GEMS[bisId] : null;
+      gems.push(bisId || 0);
+      if (bisGem) addStats(stats, bisGem.stats);
+      if (!bisGem || !gemFits(bisGem.color, sc)) allMatch = false;
+    }
+  }
+  if (!hasCap) return null; // No cap gems placed — same as BiS variant
+  var bonusActive = allMatch && item.socketBonus;
+  if (bonusActive) addStats(stats, item.socketBonus);
+  return { stats: stats, gems: gems, bonusActive: bonusActive };
+}
+
+function buildHybridGemVariant(item, bisGems, capKey) {
+  if (!item.sockets) return null;
+  // Need 2+ non-meta sockets
+  var nonMeta = 0;
+  for (var i = 0; i < item.sockets.length; i++) {
+    if (item.sockets[i] !== "meta") nonMeta++;
+  }
+  if (nonMeta < 2) return null;
+
+  var stats = {};
+  var gems = [];
+  var allMatch = true;
+  var capPlaced = false;
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    if (sc === "meta") {
+      var metaId = bisGems.meta;
+      var meta = metaId ? GEMS[metaId] : null;
+      gems.push(metaId || 0);
+      if (meta) addStats(stats, meta.stats);
+      if (!meta || !gemFits(meta.color, sc)) allMatch = false;
+      continue;
+    }
+    if (!capPlaced) {
+      var capGemId = getCapGemId(sc, capKey);
+      if (capGemId) {
+        gems.push(capGemId);
+        var capGem = GEMS[capGemId];
+        if (capGem) addStats(stats, capGem.stats);
+        if (!gemFits(capGem.color, sc)) allMatch = false;
+        capPlaced = true;
+        continue;
+      }
+    }
+    // BiS gem for remaining sockets
+    var bisId = bisGems[sc];
+    var bisGem = bisId ? GEMS[bisId] : null;
+    gems.push(bisId || 0);
+    if (bisGem) addStats(stats, bisGem.stats);
+    if (!bisGem || !gemFits(bisGem.color, sc)) allMatch = false;
+  }
+  if (!capPlaced) return null;
+  var bonusActive = allMatch && item.socketBonus;
+  if (bonusActive) addStats(stats, item.socketBonus);
+  return { stats: stats, gems: gems, bonusActive: bonusActive };
+}
+
+function generateGemVariants(item, specSlug, capKey) {
+  var bisGems = getActiveBisGems(specSlug);
+  if (!bisGems || !item.sockets || item.sockets.length === 0) {
+    return [{ stats: {}, gems: [], bonusActive: false }];
+  }
+  var variants = [buildBisGemVariant(item, bisGems)];
+  if (capKey) {
+    var capVar = buildCapGemVariant(item, bisGems, capKey);
+    if (capVar) {
+      // Check it's actually different from BiS variant
+      var diff = false;
+      for (var i = 0; i < capVar.gems.length; i++) {
+        if (capVar.gems[i] !== variants[0].gems[i]) { diff = true; break; }
+      }
+      if (diff) variants.push(capVar);
+    }
+    var hybVar = buildHybridGemVariant(item, bisGems, capKey);
+    if (hybVar) {
+      // Check hybrid differs from BiS variant
+      var diffFromBis = false;
+      for (var i = 0; i < hybVar.gems.length; i++) {
+        if (hybVar.gems[i] !== variants[0].gems[i]) { diffFromBis = true; break; }
+      }
+      // Check hybrid differs from cap variant
+      var diffFromCap = true;
+      if (capVar) {
+        diffFromCap = false;
+        for (var i = 0; i < hybVar.gems.length; i++) {
+          if (hybVar.gems[i] !== capVar.gems[i]) { diffFromCap = true; break; }
+        }
+      }
+      if (diffFromBis && diffFromCap) variants.push(hybVar);
+    }
+  }
+  return variants;
+}
+
+// Step 3: Equipment group builder
+function getEnchantStats(specSlug, slotKey) {
+  var enchId = getActiveBisEnchant(specSlug, slotKey);
+  if (!enchId) return {};
+  var ench = findEnchantById(slotKey, enchId);
+  return ench && ench.stats ? ench.stats : {};
+}
+
+function buildCandidate(items, gemVariant, enchantStats, specSlug, capKey) {
+  // items = { slotKey: item, ... }, gemVariant = { stats, gems, bonusActive }
+  var totalStats = {};
+  var slotKeys = Object.keys(items);
+  for (var i = 0; i < slotKeys.length; i++) {
+    var item = items[slotKeys[i]];
+    if (item && item.stats) addStats(totalStats, item.stats);
+  }
+  addStats(totalStats, gemVariant.stats);
+  addStats(totalStats, enchantStats);
+
+  var capStat = capKey ? (totalStats[capKey] || 0) : 0;
+
+  // Score = sum of weight * stat, with cap-stat at 1.5x primary
+  var weights = STAT_WEIGHTS[specSlug];
+  var spec = SPECS[specSlug];
+  var score = 0;
+  var keys = Object.keys(totalStats);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var v = totalStats[k];
+    if (k === capKey) {
+      score += capAwareWeight(k, spec, weights) * v;
+    } else {
+      score += (weights[k] || 0) * v;
+    }
+  }
+  score = Math.round(score * 10) / 10;
+
+  return {
+    items: items,
+    gems: gemVariant.gems,
+    bonusActive: gemVariant.bonusActive,
+    enchantStats: enchantStats,
+    capStat: capStat,
+    score: score
+  };
+}
+
+function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
+  var capKey = spec.hitCap ? "hit" : (spec.defCap ? "def" : null);
+  var groups = [];
+  var singleSlots = ["head","neck","shoulders","back","chest","wrists","hands","waist","legs","feet"];
+
+  // Single slots
+  for (var s = 0; s < singleSlots.length; s++) {
+    var sk = singleSlots[s];
+    if (!spec.slots[sk]) continue;
+    var matches = findInventoryMatches(sk, spec, allInv, tracked);
+    var candidates = [];
+    for (var m = 0; m < matches.length; m++) {
+      var item = matches[m].item;
+      var enchStats = getEnchantStats(specSlug, sk);
+      var gemVars = generateGemVariants(item, specSlug, capKey);
+      for (var g = 0; g < gemVars.length; g++) {
+        var obj = {};
+        obj[sk] = item;
+        candidates.push(buildCandidate(obj, gemVars[g], enchStats, specSlug, capKey));
+      }
+    }
+    // Add empty candidate (no item in this slot)
+    if (candidates.length === 0) {
+      var emptyObj = {};
+      candidates.push(buildCandidate(emptyObj, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: sk, candidates: candidates });
+  }
+
+  // Paired slots: rings
+  var ringSlots = ["ring1","ring2"];
+  if (spec.slots.ring1) {
+    // Pool all owned rings from ring1 + ring2
+    var ringPool = [];
+    var ringSeen = {};
+    for (var r = 0; r < ringSlots.length; r++) {
+      var rm = findInventoryMatches(ringSlots[r], spec, allInv, tracked);
+      for (var i = 0; i < rm.length; i++) {
+        if (!ringSeen[rm[i].item.id]) {
+          ringSeen[rm[i].item.id] = true;
+          ringPool.push(rm[i].item);
+        }
+      }
+    }
+    var ringCandidates = [];
+    var enchR1 = getEnchantStats(specSlug, "ring1");
+    var enchR2 = getEnchantStats(specSlug, "ring2");
+    var combinedRingEnch = {};
+    addStats(combinedRingEnch, enchR1);
+    addStats(combinedRingEnch, enchR2);
+
+    // All 2-item combos (uniqueness enforced)
+    for (var a = 0; a < ringPool.length; a++) {
+      for (var b = a + 1; b < ringPool.length; b++) {
+        var gvA = generateGemVariants(ringPool[a], specSlug, capKey);
+        var gvB = generateGemVariants(ringPool[b], specSlug, capKey);
+        for (var ga = 0; ga < gvA.length; ga++) {
+          for (var gb = 0; gb < gvB.length; gb++) {
+            var merged = { stats:{}, gems: gvA[ga].gems.concat(gvB[gb].gems), bonusActive: gvA[ga].bonusActive && gvB[gb].bonusActive };
+            addStats(merged.stats, gvA[ga].stats);
+            addStats(merged.stats, gvB[gb].stats);
+            var obj = { ring1: ringPool[a], ring2: ringPool[b] };
+            ringCandidates.push(buildCandidate(obj, merged, combinedRingEnch, specSlug, capKey));
+          }
+        }
+      }
+      // Single ring (only one owned)
+      var gvSingle = generateGemVariants(ringPool[a], specSlug, capKey);
+      for (var gs = 0; gs < gvSingle.length; gs++) {
+        var obj1 = { ring1: ringPool[a] };
+        ringCandidates.push(buildCandidate(obj1, gvSingle[gs], enchR1, specSlug, capKey));
+      }
+    }
+    if (ringCandidates.length === 0) {
+      ringCandidates.push(buildCandidate({}, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: "rings", candidates: ringCandidates });
+  }
+
+  // Paired slots: trinkets
+  var trinketSlots = ["trinket1","trinket2"];
+  if (spec.slots.trinket1) {
+    var trinketPool = [];
+    var trinketSeen = {};
+    for (var t = 0; t < trinketSlots.length; t++) {
+      var tm = findInventoryMatches(trinketSlots[t], spec, allInv, tracked);
+      for (var i = 0; i < tm.length; i++) {
+        if (!trinketSeen[tm[i].item.id]) {
+          trinketSeen[tm[i].item.id] = true;
+          trinketPool.push(tm[i].item);
+        }
+      }
+    }
+    var trinketCandidates = [];
+    for (var a = 0; a < trinketPool.length; a++) {
+      for (var b = a + 1; b < trinketPool.length; b++) {
+        var gvA = generateGemVariants(trinketPool[a], specSlug, capKey);
+        var gvB = generateGemVariants(trinketPool[b], specSlug, capKey);
+        for (var ga = 0; ga < gvA.length; ga++) {
+          for (var gb = 0; gb < gvB.length; gb++) {
+            var merged = { stats:{}, gems: gvA[ga].gems.concat(gvB[gb].gems), bonusActive: gvA[ga].bonusActive && gvB[gb].bonusActive };
+            addStats(merged.stats, gvA[ga].stats);
+            addStats(merged.stats, gvB[gb].stats);
+            trinketCandidates.push(buildCandidate({ trinket1: trinketPool[a], trinket2: trinketPool[b] }, merged, {}, specSlug, capKey));
+          }
+        }
+      }
+      var gvS = generateGemVariants(trinketPool[a], specSlug, capKey);
+      for (var gs = 0; gs < gvS.length; gs++) {
+        trinketCandidates.push(buildCandidate({ trinket1: trinketPool[a] }, gvS[gs], {}, specSlug, capKey));
+      }
+    }
+    if (trinketCandidates.length === 0) {
+      trinketCandidates.push(buildCandidate({}, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: "trinkets", candidates: trinketCandidates });
+  }
+
+  // Weapon super-group: MH+OH pairs + 2H options
+  var hasMH = !!spec.slots.mainhand;
+  var has2H = !!spec.slots.twohand;
+  var hasOH = !!spec.slots.offhand;
+  if (hasMH || has2H) {
+    var weaponCandidates = [];
+    var enchMH = getEnchantStats(specSlug, "mainhand");
+    var enchOH = getEnchantStats(specSlug, "offhand");
+    var ench2H = getEnchantStats(specSlug, "twohand");
+
+    if (hasMH) {
+      var mhMatches = findInventoryMatches("mainhand", spec, allInv, tracked);
+      var ohMatches = hasOH ? findInventoryMatches("offhand", spec, allInv, tracked) : [];
+
+      // MH + OH combos
+      for (var mi = 0; mi < mhMatches.length; mi++) {
+        var mhItem = mhMatches[mi].item;
+        var mhGems = generateGemVariants(mhItem, specSlug, capKey);
+        if (ohMatches.length > 0) {
+          for (var oi = 0; oi < ohMatches.length; oi++) {
+            var ohItem = ohMatches[oi].item;
+            var ohGems = generateGemVariants(ohItem, specSlug, capKey);
+            for (var gm = 0; gm < mhGems.length; gm++) {
+              for (var go = 0; go < ohGems.length; go++) {
+                var merged = { stats:{}, gems: mhGems[gm].gems.concat(ohGems[go].gems), bonusActive: mhGems[gm].bonusActive && ohGems[go].bonusActive };
+                addStats(merged.stats, mhGems[gm].stats);
+                addStats(merged.stats, ohGems[go].stats);
+                var combinedEnch = {};
+                addStats(combinedEnch, enchMH);
+                addStats(combinedEnch, enchOH);
+                weaponCandidates.push(buildCandidate({ mainhand: mhItem, offhand: ohItem }, merged, combinedEnch, specSlug, capKey));
+              }
+            }
+          }
+        } else {
+          // MH only (no OH)
+          for (var gm = 0; gm < mhGems.length; gm++) {
+            weaponCandidates.push(buildCandidate({ mainhand: mhItem }, mhGems[gm], enchMH, specSlug, capKey));
+          }
+        }
+      }
+    }
+    if (has2H) {
+      var thMatches = findInventoryMatches("twohand", spec, allInv, tracked);
+      for (var ti = 0; ti < thMatches.length; ti++) {
+        var thItem = thMatches[ti].item;
+        var thGems = generateGemVariants(thItem, specSlug, capKey);
+        for (var gt = 0; gt < thGems.length; gt++) {
+          weaponCandidates.push(buildCandidate({ twohand: thItem }, thGems[gt], ench2H, specSlug, capKey));
+        }
+      }
+    }
+    if (weaponCandidates.length === 0) {
+      weaponCandidates.push(buildCandidate({}, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: "weapons", candidates: weaponCandidates });
+  }
+
+  // Wand (single)
+  if (spec.slots.wand) {
+    var wandMatches = findInventoryMatches("wand", spec, allInv, tracked);
+    var wandCandidates = [];
+    for (var w = 0; w < wandMatches.length; w++) {
+      var wItem = wandMatches[w].item;
+      var wGems = generateGemVariants(wItem, specSlug, capKey);
+      for (var gw = 0; gw < wGems.length; gw++) {
+        wandCandidates.push(buildCandidate({ wand: wItem }, wGems[gw], {}, specSlug, capKey));
+      }
+    }
+    if (wandCandidates.length === 0) {
+      wandCandidates.push(buildCandidate({}, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: "wand", candidates: wandCandidates });
+  }
+
+  // Libram / Relic (single)
+  if (spec.slots.libram) {
+    var libMatches = findInventoryMatches("libram", spec, allInv, tracked);
+    var libCandidates = [];
+    for (var l = 0; l < libMatches.length; l++) {
+      var lItem = libMatches[l].item;
+      var lGems = generateGemVariants(lItem, specSlug, capKey);
+      for (var gl = 0; gl < lGems.length; gl++) {
+        libCandidates.push(buildCandidate({ libram: lItem }, lGems[gl], {}, specSlug, capKey));
+      }
+    }
+    if (libCandidates.length === 0) {
+      libCandidates.push(buildCandidate({}, { stats:{}, gems:[], bonusActive:false }, {}, specSlug, capKey));
+    }
+    groups.push({ name: "libram", candidates: libCandidates });
+  }
+
+  return groups;
+}
+
+// Step 4: DP optimizer core
+function optimizeGearSet(specSlug) {
+  var spec = SPECS[specSlug];
+  if (!spec || !hasStatWeights(specSlug)) return null;
+
+  var inventory = loadInventory();
+  if (!inventory) return null;
+  var allInv = (inventory.bags || []).concat(inventory.bank || []);
+  var tracked = loadTracker();
+
+  var capKey = spec.hitCap ? "hit" : (spec.defCap ? "def" : null);
+  var capVal = spec.hitCap || spec.defCap || 0;
+
+  // No-cap fallback (healers, etc.)
+  if (!capKey) {
+    lastOptimizerResult = greedyBestPerSlot(specSlug, spec, allInv, tracked);
+    return lastOptimizerResult;
+  }
+
+  var groups = buildEquipmentGroups(spec, allInv, tracked, specSlug);
+  if (groups.length === 0) return null;
+
+  var maxCap = capVal + 30; // allow some overcap in DP states
+
+  // DP forward pass
+  // dp[capAmount] = { score, path: [candidateIdx per group] }
+  var dp = new Array(maxCap + 1);
+  dp[0] = { score: 0, path: [] };
+
+  for (var gi = 0; gi < groups.length; gi++) {
+    var cands = groups[gi].candidates;
+    var newDp = new Array(maxCap + 1);
+
+    for (var state = 0; state <= maxCap; state++) {
+      if (!dp[state]) continue;
+      for (var ci = 0; ci < cands.length; ci++) {
+        var newState = Math.min(state + cands[ci].capStat, maxCap);
+        var newScore = dp[state].score + cands[ci].score;
+        if (!newDp[newState] || newScore > newDp[newState].score) {
+          var newPath = dp[state].path.slice();
+          newPath.push(ci);
+          newDp[newState] = { score: newScore, path: newPath };
+        }
+      }
+    }
+    dp = newDp;
+  }
+
+  // Pick best: prefer states at or above cap, penalize overcap
+  var weights = STAT_WEIGHTS[specSlug];
+  var capWeight = capAwareWeight(capKey, spec, weights);
+  var bestResult = null;
+  var bestAdjScore = -Infinity;
+
+  for (var state = 0; state <= maxCap; state++) {
+    if (!dp[state]) continue;
+    var adj = dp[state].score;
+    if (state > capVal) {
+      // Subtract overcap penalty: wasted cap points had capWeight, give them 0
+      adj -= (state - capVal) * capWeight;
+    }
+    if (adj > bestAdjScore) {
+      bestAdjScore = adj;
+      bestResult = { state: state, dpEntry: dp[state], adjScore: adj };
+    }
+  }
+
+  if (!bestResult) return null;
+
+  // Backtrack: reconstruct chosen candidates
+  var path = bestResult.dpEntry.path;
+  var result = {
+    totalScore: Math.round(bestAdjScore * 10) / 10,
+    capKey: capKey,
+    capVal: capVal,
+    capCurrent: bestResult.state,
+    slots: {} // slotKey → { item, gems[], enchantId }
+  };
+
+  for (var gi = 0; gi < groups.length; gi++) {
+    var chosen = groups[gi].candidates[path[gi]];
+    if (!chosen) continue;
+    var chosenSlots = Object.keys(chosen.items);
+    for (var si = 0; si < chosenSlots.length; si++) {
+      var sk = chosenSlots[si];
+      var item = chosen.items[sk];
+      if (!item) continue;
+      // Determine which gems belong to this slot
+      var slotGems = [];
+      if (item.sockets) {
+        // For paired groups, gems are concatenated — need to slice
+        var gemOffset = 0;
+        var priorSlots = Object.keys(chosen.items);
+        for (var p = 0; p < priorSlots.length; p++) {
+          if (priorSlots[p] === sk) break;
+          var priorItem = chosen.items[priorSlots[p]];
+          if (priorItem && priorItem.sockets) gemOffset += priorItem.sockets.length;
+        }
+        slotGems = chosen.gems.slice(gemOffset, gemOffset + item.sockets.length);
+      }
+      // Determine enchant (budget-aware)
+      var enchId = getActiveBisEnchant(specSlug, sk);
+      result.slots[sk] = {
+        item: item,
+        gems: slotGems,
+        enchantId: enchId,
+        score: itemScore(item, specSlug)
+      };
+    }
+  }
+
+  lastOptimizerResult = result;
+  return result;
+}
+
+function greedyBestPerSlot(specSlug, spec, allInv, tracked) {
+  var result = {
+    totalScore: 0,
+    capKey: null,
+    capVal: 0,
+    capCurrent: 0,
+    slots: {}
+  };
+
+  var allSlots = Object.keys(spec.slots);
+  var bisGems = getActiveBisGems(specSlug);
+
+  // Track used item IDs for ring/trinket uniqueness
+  var usedIds = {};
+
+  for (var i = 0; i < allSlots.length; i++) {
+    var sk = allSlots[i];
+    // Skip weapon conflicts
+    if (sk === "twohand" && spec.slots.mainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && spec.slots.twohand && !spec.slots.mainhand) continue;
+
+    var matches = findInventoryMatches(sk, spec, allInv, tracked);
+    var bestScore = -1;
+    var bestMatch = null;
+
+    for (var m = 0; m < matches.length; m++) {
+      var item = matches[m].item;
+      // Enforce ring/trinket uniqueness
+      if ((sk === "ring2" || sk === "trinket2") && usedIds[item.id]) continue;
+
+      var s = itemScore(item, specSlug);
+      if (s > bestScore) {
+        bestScore = s;
+        bestMatch = item;
+      }
+    }
+
+    if (bestMatch) {
+      usedIds[bestMatch.id] = true;
+      var gemVar = bisGems ? buildBisGemVariant(bestMatch, bisGems) : { stats:{}, gems:[], bonusActive:false };
+      var enchId = getActiveBisEnchant(specSlug, sk);
+      result.slots[sk] = {
+        item: bestMatch,
+        gems: gemVar.gems,
+        enchantId: enchId,
+        score: bestScore
+      };
+      result.totalScore += bestScore;
+    }
+  }
+
+  result.totalScore = Math.round(result.totalScore * 10) / 10;
+  return result;
+}
+
+// Step 5: Inline optimizer — swap suggestions on paperdoll
+function renderSwapSuggestion(slotKey) {
+  var swap = pendingSwaps[slotKey];
+  if (!swap) return '';
+
+  var html = '<div class="swap-suggest" onclick="event.stopPropagation()">';
+  html += '<div class="swap-arrow">&#8595;</div>';
+  html += '<div class="swap-item">';
+  html += '<div class="item-link">' + itemLink(swap.item) + '</div>';
+
+  // Gems + enchant
+  var hasGems = swap.gems && swap.gems.length > 0;
+  var hasEnchant = swap.enchantId;
+  if (hasGems || hasEnchant) {
+    html += '<div class="ge-row">';
+    if (hasGems) {
+      html += '<span class="ge-gems">';
+      for (var g = 0; g < swap.gems.length; g++) {
+        var gem = swap.gems[g] ? GEMS[swap.gems[g]] : null;
+        if (gem) {
+          html += '<a href="https://www.wowhead.com/tbc/item=' + swap.gems[g] + '" onclick="if(!event.ctrlKey&&!event.metaKey&&event.button===0){event.preventDefault();}">';
+          html += '<span class="gem-socket ' + gem.color + ' filled"></span></a>';
+        }
+      }
+      html += '</span>';
+    }
+    if (hasGems && hasEnchant) html += '<span class="ge-sep">|</span>';
+    if (hasEnchant) {
+      var ench = findEnchantById(slotKey, swap.enchantId);
+      if (ench) html += '<span class="ge-enchant">' + ench.name + '</span>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  html += '<div class="swap-actions">';
+  html += '<button class="swap-accept" onclick="event.stopPropagation();acceptSwap(\'' + slotKey + '\')" title="Accept">&#10003;</button>';
+  html += '<button class="swap-reject" onclick="event.stopPropagation();rejectSwap(\'' + slotKey + '\')" title="Dismiss">&#10005;</button>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function runOptimizerInline() {
+  var result = optimizeGearSet(currentSpec);
+  if (!result) {
+    pendingSwaps = null;
+    optimizerMessage = "No matching items found";
+    renderSheet();
+    return;
+  }
+
+  // Compare result slots against current tracker — build pendingSwaps only for diffs
+  pendingSwaps = {};
+  var trackedGems = loadTrackerGems();
+  var trackedEnchants = loadTrackerEnchants();
+  var slotKeys = Object.keys(result.slots);
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    var opt = result.slots[sk];
+    if (!opt || !opt.item) continue;
+
+    var cur = getTrackedItem(sk);
+    var isDifferent = false;
+
+    if (!cur) {
+      isDifferent = true;
+    } else if (cur.id !== opt.item.id) {
+      isDifferent = true;
+    } else {
+      // Same item — check gems
+      var curGems = trackedGems[sk] || [];
+      if (opt.gems && opt.gems.length) {
+        for (var g = 0; g < opt.gems.length; g++) {
+          if ((opt.gems[g] || 0) !== (curGems[g] || 0)) { isDifferent = true; break; }
+        }
+      }
+      // Check enchant
+      if (!isDifferent) {
+        var curEnch = trackedEnchants[sk] || 0;
+        if ((opt.enchantId || 0) !== (curEnch || 0)) isDifferent = true;
+      }
+    }
+
+    if (isDifferent) {
+      pendingSwaps[sk] = opt;
+    }
+  }
+
+  if (Object.keys(pendingSwaps).length === 0) {
+    pendingSwaps = null;
+    optimizerMessage = "Already optimized!";
+  }
+
+  renderSheet();
+  refreshWowheadLinks();
+}
+
+function acceptSwap(slotKey) {
+  if (!pendingSwaps || !pendingSwaps[slotKey]) return;
+  var swap = pendingSwaps[slotKey];
+  var spec = specData();
+
+  // Find index in SPECS
+  var items = spec.slots[slotKey];
+  var idx = -1;
+  if (items) {
+    for (var j = 0; j < items.length; j++) {
+      if (items[j].id === swap.item.id) { idx = j; break; }
+    }
+  }
+  var tracker = loadTracker();
+  tracker[slotKey] = idx >= 0 ? idx : ("c:" + swap.item.id + ":" + swap.item.name);
+  saveTracker(tracker);
+
+  // Set gems
+  if (swap.gems && swap.gems.length) {
+    var gemData = loadTrackerGems();
+    if (!gemData[slotKey]) gemData[slotKey] = [];
+    for (var g = 0; g < swap.gems.length; g++) {
+      if (swap.gems[g]) gemData[slotKey][g] = swap.gems[g];
+    }
+    saveTrackerGems(gemData);
+  }
+
+  // Set enchant
+  if (swap.enchantId) {
+    var enchData = loadTrackerEnchants();
+    enchData[slotKey] = swap.enchantId;
+    saveTrackerEnchants(enchData);
+  }
+
+  delete pendingSwaps[slotKey];
+  if (Object.keys(pendingSwaps).length === 0) pendingSwaps = null;
+
+  renderSheet();
+  refreshWowheadLinks();
+}
+
+function rejectSwap(slotKey) {
+  if (!pendingSwaps) return;
+  delete pendingSwaps[slotKey];
+  if (Object.keys(pendingSwaps).length === 0) pendingSwaps = null;
+  renderSheet();
+  refreshWowheadLinks();
+}
+
+function applyAllSwaps() {
+  if (!pendingSwaps) return;
+  var spec = specData();
+  var tracker = loadTracker();
+  var gemData = loadTrackerGems();
+  var enchData = loadTrackerEnchants();
+
+  var slotKeys = Object.keys(pendingSwaps);
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    var swap = pendingSwaps[sk];
+    if (!swap || !swap.item) continue;
+
+    var items = spec.slots[sk];
+    var idx = -1;
+    if (items) {
+      for (var j = 0; j < items.length; j++) {
+        if (items[j].id === swap.item.id) { idx = j; break; }
+      }
+    }
+    tracker[sk] = idx >= 0 ? idx : ("c:" + swap.item.id + ":" + swap.item.name);
+
+    if (swap.gems && swap.gems.length) {
+      if (!gemData[sk]) gemData[sk] = [];
+      for (var g = 0; g < swap.gems.length; g++) {
+        if (swap.gems[g]) gemData[sk][g] = swap.gems[g];
+      }
+    }
+
+    if (swap.enchantId) {
+      enchData[sk] = swap.enchantId;
+    }
+  }
+
+  saveTracker(tracker);
+  saveTrackerGems(gemData);
+  saveTrackerEnchants(enchData);
+  pendingSwaps = null;
+
+  renderSheet();
+  refreshWowheadLinks();
+}
+
+function dismissAllSwaps() {
+  pendingSwaps = null;
+  renderSheet();
+  refreshWowheadLinks();
+}
+
 function findBestInventoryItem(slotKey, inventory) {
   var spec = specData();
   var slotItems = spec.slots[slotKey];
@@ -2737,7 +3897,7 @@ function renderRaidSetup() {
   html += '</div>';
 
   // Gem suggestions
-  var bisGems = BIS_GEMS[currentSpec];
+  var bisGems = getActiveBisGems(currentSpec);
   if (bisGems) {
     var gemSuggestions = [];
     for (var i = 0; i < slotKeys.length; i++) {

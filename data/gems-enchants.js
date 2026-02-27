@@ -280,3 +280,45 @@ var BIS_ENCHANTS = {
   "mm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977},
   "survival-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977}
 };
+
+// ---------------------------------------------------------------------------
+// Budget Mode Maps — Rare → Uncommon gems, Exalted → Honored enchants
+// ---------------------------------------------------------------------------
+var BUDGET_GEM_MAP = {
+  // Red: Living Ruby → Blood Garnet
+  24030: 23096,  // Runed: sp:9 → sp:7
+  24027: 23095,  // Bold: str:8 → str:6
+  24028: 23097,  // Delicate: agi:8 → agi:6
+  24036: 23094,  // Teardrop: heal:18 → heal:13
+  // Orange: Noble Topaz → Flame Spessarite
+  24059: 23101,  // Potent: sp:5,crit:4 → sp:4,crit:3
+  24061: 23098,  // Inscribed: str:4,crit:4 → str:3,crit:3
+  // Yellow: Dawnstone → Golden Draenite
+  24048: 23114,  // Smooth: crit:8 → crit:6
+  24047: 23113,  // Brilliant: int:8 → int:6
+  // Blue: Star of Elune → Azure Moonstone
+  24033: 23118,  // Solid: stam:12 → stam:9
+  24039: 23119,  // Lustrous: mp5:4 → mp5:3
+  // Purple: Nightseye → Shadow Draenite
+  24056: 23108,  // Glowing: sp:5,stam:6 → sp:4,stam:4
+  24054: 23109,  // Sovereign: str:4,stam:6 → str:3,stam:4
+  24055: 23110,  // Shifting: agi:4,stam:6 → agi:3,stam:4
+  // Green: Talasite → Deep Peridot
+  24065: 23105   // Enduring: def:4,stam:6 → def:3,stam:4
+};
+
+var BUDGET_ENCHANT_MAP = {
+  // Shoulders: Exalted → Honored (same stat type)
+  28886: 28881,  // Greater Insc. of Discipline → Insc. of Discipline
+  28909: 28881,  // Greater Insc. of the Oracle → Insc. of Discipline
+  28888: 28885,  // Greater Insc. of the Blade → Insc. of Vengeance
+  28889: 28882,  // Greater Insc. of the Knight → Insc. of Warding
+  23545: 28885,  // Greater Insc. of Vengeance → Insc. of Vengeance
+  23547: 28903,  // Greater Insc. of the Orb → Insc. of the Orb
+  // Legs: Exalted → budget
+  31372: 31373,  // Runic Spellthread → Mystic Spellthread
+  // Rings: skip entirely (require 360 Enchanting)
+  27927: null,   // Spellpower → skip
+  27926: null,   // Healing Power → skip
+  27924: null    // Stats → skip
+};
