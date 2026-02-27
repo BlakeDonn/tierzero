@@ -1807,6 +1807,7 @@ function getTrackerStats() {
   var trackedEnchants = loadTrackerEnchants();
   var trackedGems = loadTrackerGems();
   var stats = {};
+  var _log = [];
   // Determine which weapon setup is active to avoid double-counting
   var hasTrackedMainhand = tracked["mainhand"] !== undefined && tracked["mainhand"] !== "";
   var hasTrackedTwohand = tracked["twohand"] !== undefined && tracked["twohand"] !== "";
@@ -1819,19 +1820,34 @@ function getTrackerStats() {
     if ((slot === "mainhand" || slot === "offhand") && hasTrackedTwohand && !hasTrackedMainhand) continue;
 
     var item = getTrackedItem(slot);
-    if (!item) continue;
-    if (item.stats) addStats(stats, item.stats);
+    if (!item) { _log.push(slot + ': (empty)'); continue; }
+    var slotLog = slot + ': ' + item.name + (item.isCustom ? ' [CUSTOM]' : ' [BiS]');
+    if (item.stats) {
+      addStats(stats, item.stats);
+      slotLog += ' stats=' + JSON.stringify(item.stats);
+    } else {
+      slotLog += ' stats=NULL';
+    }
 
     // Add tracked gem stats
     if (item.sockets && trackedGems[slot]) {
       var slotGems = trackedGems[slot];
+      var gemParts = [];
       for (var s = 0; s < item.sockets.length; s++) {
         var gId = slotGems[s];
         if (gId) {
           var gem = GEMS[gId];
-          if (gem && gem.stats) addStats(stats, gem.stats);
+          if (gem && gem.stats) {
+            addStats(stats, gem.stats);
+            gemParts.push(gem.name + '(' + JSON.stringify(gem.stats) + ')');
+          } else {
+            gemParts.push('id:' + gId + '(UNKNOWN)');
+          }
+        } else {
+          gemParts.push('empty');
         }
       }
+      slotLog += ' gems=[' + gemParts.join(', ') + ']';
       // Socket bonus check
       if (item.socketBonus) {
         var allMatched = true;
@@ -1840,16 +1856,35 @@ function getTrackerStats() {
           var gem = gId ? GEMS[gId] : null;
           if (!gem || !gemFits(gem.color, item.sockets[s])) { allMatched = false; break; }
         }
-        if (allMatched) addStats(stats, item.socketBonus);
+        if (allMatched) {
+          addStats(stats, item.socketBonus);
+          slotLog += ' bonus=' + JSON.stringify(item.socketBonus);
+        } else {
+          slotLog += ' bonus=UNMATCHED(' + JSON.stringify(item.socketBonus) + ' sockets=' + JSON.stringify(item.sockets) + ')';
+        }
       }
+    } else if (item.sockets && !trackedGems[slot]) {
+      slotLog += ' sockets=' + JSON.stringify(item.sockets) + ' (no gems tracked)';
+    } else if (!item.sockets) {
+      slotLog += ' (no sockets)';
     }
 
     // Add tracked enchant stats
     if (trackedEnchants[slot]) {
       var ench = findEnchantById(slot, trackedEnchants[slot]);
-      if (ench && ench.stats) addStats(stats, ench.stats);
+      if (ench && ench.stats) {
+        addStats(stats, ench.stats);
+        slotLog += ' ench=' + ench.name + '(' + JSON.stringify(ench.stats) + ')';
+      } else {
+        slotLog += ' ench=id:' + trackedEnchants[slot] + '(NOT FOUND)';
+      }
     }
+    _log.push(slotLog);
   }
+  console.group('[TZ Stats] Tracker stat computation');
+  for (var l = 0; l < _log.length; l++) console.log(_log[l]);
+  console.log('[TZ Stats] TOTAL:', JSON.stringify(stats));
+  console.groupEnd();
   return stats;
 }
 
@@ -2317,10 +2352,16 @@ function importEquippedGear(parsed) {
   var importedEnchants = {};
   var importedGems = {};
 
+  console.group('[TZ Import] Starting gear import');
+  console.log('Spec:', spec.spec, '(' + spec.class + ')');
+
   var slots = Object.keys(parsed.equipped);
   for (var i = 0; i < slots.length; i++) {
     var slot = slots[i];
-    if (!spec.slots[slot]) continue;
+    if (!spec.slots[slot]) {
+      console.warn('[TZ Import] Slot "' + slot + '" not in spec — skipped');
+      continue;
+    }
     var importedItem = parsed.equipped[slot];
     total++;
 
@@ -2337,12 +2378,21 @@ function importEquippedGear(parsed) {
     if (bisIdx >= 0) {
       trackItem(slot, bisIdx);
       bisCount++;
+      console.log('[TZ Import] %c' + slot + '%c: BiS #' + bisIdx + ' — ' + importedItem.name + ' (id:' + importedItem.id + ') stats:', 'color:#1eff00;font-weight:bold', 'color:inherit', slotItems[bisIdx].stats);
     } else {
       trackItem(slot, 'c:' + importedItem.id + ':' + importedItem.name);
+      console.log('[TZ Import] %c' + slot + '%c: CUSTOM — ' + importedItem.name + ' (id:' + importedItem.id + ') — will fetch from Wowhead', 'color:#ff8000;font-weight:bold', 'color:inherit');
       // Fetch stats for custom item
-      fetchCustomItemStats(importedItem.id, function() {
-        renderTracker();
-      });
+      (function(s, id, name) {
+        fetchCustomItemStats(id, function(data) {
+          if (data) {
+            console.log('[TZ Import] Fetched ' + name + ' (id:' + id + '):', 'stats:', data.stats, 'sockets:', data.sockets, 'socketBonus:', data.socketBonus);
+          } else {
+            console.error('[TZ Import] FAILED to fetch stats for ' + name + ' (id:' + id + ')');
+          }
+          renderTracker();
+        });
+      })(slot, importedItem.id, importedItem.name);
       customCount++;
     }
 
@@ -2355,6 +2405,7 @@ function importEquippedGear(parsed) {
         if (matchedEnch) {
           importedEnchants[slot] = matchedEnch.id;
           matched = true;
+          console.log('[TZ Import]   enchant (' + slot + '): tooltip match — ' + matchedEnch.name + ' (id:' + matchedEnch.id + ')', matchedEnch.stats);
         }
       }
       // Fall back to ID mapping
@@ -2362,9 +2413,11 @@ function importEquippedGear(parsed) {
         var spellId = ENCHANT_LINK_MAP[importedItem.enchant];
         if (spellId) {
           importedEnchants[slot] = spellId;
+          console.log('[TZ Import]   enchant (' + slot + '): ID map ' + importedItem.enchant + ' → ' + spellId);
         } else {
           // Store raw ID so it's not lost
           importedEnchants[slot] = importedItem.enchant;
+          console.warn('[TZ Import]   enchant (' + slot + '): NO MATCH for linkId=' + importedItem.enchant + ' tooltip="' + (importedItem.enchantName || '') + '" — stored raw');
         }
       }
     }
@@ -2373,17 +2426,23 @@ function importEquippedGear(parsed) {
     if (importedItem.gems) {
       var validGems = [];
       var hasAny = false;
+      var gemLog = [];
       for (var g = 0; g < importedItem.gems.length; g++) {
         var gId = importedItem.gems[g];
         if (gId > 0) {
-          // Store any non-zero gem ID, even if not in our GEMS database
           validGems.push(gId);
           hasAny = true;
+          var gemInfo = GEMS[gId];
+          gemLog.push(gId + (gemInfo ? ' (' + gemInfo.name + ' ' + JSON.stringify(gemInfo.stats) + ')' : ' (UNKNOWN)'));
         } else {
           validGems.push(null);
+          gemLog.push('empty');
         }
       }
-      if (hasAny) importedGems[slot] = validGems;
+      if (hasAny) {
+        importedGems[slot] = validGems;
+        console.log('[TZ Import]   gems (' + slot + '): [' + gemLog.join(', ') + ']');
+      }
     }
   }
 
@@ -2399,6 +2458,10 @@ function importEquippedGear(parsed) {
     saveTrackerGems(existingGems);
   }
 
+  console.log('[TZ Import] Done: ' + total + ' items (' + bisCount + ' BiS, ' + customCount + ' custom)');
+  console.log('[TZ Import] Enchants saved:', importedEnchants);
+  console.log('[TZ Import] Gems saved:', importedGems);
+  console.groupEnd();
   return { total: total, bis: bisCount, custom: customCount };
 }
 
