@@ -735,6 +735,197 @@ function itemScore(item, specSlug) {
   return Math.round(score * 10) / 10;
 }
 
+// Cap-aware delta: scores only the useful portion of hit/def (up to cap)
+// otherCapTotal = cap stat from all other slots (excluding the slot being compared)
+// capVal = the cap value (e.g. 142 for hit)
+function capAwareDelta(item, refItem, specSlug, otherCapTotal, capKey, capVal) {
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return itemScore(item, specSlug) - itemScore(refItem, specSlug);
+  var spec = SPECS[specSlug];
+  if (!spec) return itemScore(item, specSlug) - itemScore(refItem, specSlug);
+
+  var capWeight = capAwareWeight(capKey, spec, weights);
+  var scoreA = 0, scoreB = 0;
+
+  // Score item A
+  if (item && item.stats) {
+    var ks = Object.keys(item.stats);
+    for (var i = 0; i < ks.length; i++) {
+      var k = ks[i], v = item.stats[k];
+      if (k === capKey && capVal) {
+        var useful = Math.max(0, Math.min(v, capVal - otherCapTotal));
+        scoreA += useful * capWeight;
+      } else if (k === "hit" || k === "def") {
+        // The other cap stat (e.g. def when capKey is hit) — no cap context, use flat
+        scoreA += capAwareWeight(k, spec, weights) * v;
+      } else {
+        scoreA += (weights[k] || 0) * v;
+      }
+    }
+  }
+
+  // Score item B (reference)
+  if (refItem && refItem.stats) {
+    var ks2 = Object.keys(refItem.stats);
+    for (var i = 0; i < ks2.length; i++) {
+      var k = ks2[i], v = refItem.stats[k];
+      if (k === capKey && capVal) {
+        var useful = Math.max(0, Math.min(v, capVal - otherCapTotal));
+        scoreB += useful * capWeight;
+      } else if (k === "hit" || k === "def") {
+        scoreB += capAwareWeight(k, spec, weights) * v;
+      } else {
+        scoreB += (weights[k] || 0) * v;
+      }
+    }
+  }
+
+  return Math.round((scoreA - scoreB) * 10) / 10;
+}
+
+// Get cap stat total from all slots except excludeSlot (includes gems, socket bonuses, enchants)
+// mode: "bis" uses #1 BiS items, "mygear" uses tracker items
+function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
+  var spec = SPECS[specSlug];
+  if (!spec) return 0;
+  var total = 0;
+  var slotKeys = Object.keys(spec.slots);
+  var hasMainhand = !!spec.slots["mainhand"];
+  var hasTwohand = !!spec.slots["twohand"];
+
+  // Load tracker data once for mygear mode
+  var trackedGems = (mode === "mygear") ? loadTrackerGems() : null;
+  var trackedEnchants = (mode === "mygear") ? loadTrackerEnchants() : null;
+  var bisGems = (mode === "bis") ? BIS_GEMS[specSlug] : null;
+  var bisEnchants = (mode === "bis") ? BIS_ENCHANTS[specSlug] : null;
+
+  for (var i = 0; i < slotKeys.length; i++) {
+    var sk = slotKeys[i];
+    if (sk === excludeSlot) continue;
+    // Weapon exclusion logic
+    if (sk === "twohand" && hasMainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && hasTwohand && !hasMainhand) continue;
+
+    var item;
+    if (mode === "mygear") {
+      item = getTrackedItem(sk);
+    } else {
+      var items = spec.slots[sk];
+      if (items) {
+        for (var j = 0; j < items.length; j++) {
+          if (!isItemFiltered(items[j])) { item = items[j]; break; }
+        }
+      }
+    }
+
+    // Base item stats
+    if (item && item.stats && item.stats[capKey]) {
+      total += item.stats[capKey];
+    }
+
+    // Gem stats
+    if (mode === "mygear") {
+      if (item && item.sockets && trackedGems && trackedGems[sk]) {
+        var slotGems = trackedGems[sk];
+        var allMatch = true;
+        for (var g = 0; g < item.sockets.length; g++) {
+          var gId = slotGems[g];
+          if (gId) {
+            var gem = GEMS[gId];
+            if (gem && gem.stats && gem.stats[capKey]) total += gem.stats[capKey];
+            if (!gem || !gemFits(gem.color, item.sockets[g])) allMatch = false;
+          } else {
+            allMatch = false;
+          }
+        }
+        // Socket bonus
+        if (allMatch && item.socketBonus && item.socketBonus[capKey]) {
+          total += item.socketBonus[capKey];
+        }
+      }
+      // Enchant stats
+      if (trackedEnchants && trackedEnchants[sk]) {
+        var ench = findEnchantById(sk, trackedEnchants[sk]);
+        if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
+      }
+    } else {
+      // BiS mode: use BIS_GEMS and BIS_ENCHANTS
+      if (bisGems && item && item.sockets) {
+        var allMatch = true;
+        for (var g = 0; g < item.sockets.length; g++) {
+          var sc = item.sockets[g];
+          var gId = bisGems[sc];
+          if (gId) {
+            var gem = GEMS[gId];
+            if (gem && gem.stats && gem.stats[capKey]) total += gem.stats[capKey];
+            if (!gem || !gemFits(gem.color, sc)) allMatch = false;
+          } else {
+            allMatch = false;
+          }
+        }
+        if (allMatch && item.socketBonus && item.socketBonus[capKey]) {
+          total += item.socketBonus[capKey];
+        }
+      }
+      if (bisEnchants && bisEnchants[sk]) {
+        var ench = findEnchantById(sk, bisEnchants[sk]);
+        if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
+      }
+    }
+  }
+  return total;
+}
+
+function scoreBreakdownTooltip(item, refItem, specSlug, otherCapTotal, capKey, capVal) {
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return '';
+  var spec = SPECS[specSlug];
+  if (!spec) return '';
+  // Collect all stat keys from both items
+  var allKeys = {};
+  if (item && item.stats) { var ks = Object.keys(item.stats); for (var i = 0; i < ks.length; i++) allKeys[ks[i]] = true; }
+  if (refItem && refItem.stats) { var ks2 = Object.keys(refItem.stats); for (var i = 0; i < ks2.length; i++) allKeys[ks2[i]] = true; }
+  var lines = [];
+  var sorted = Object.keys(allKeys).sort(function(a, b) {
+    var wa = (a === "hit" || a === "def") ? capAwareWeight(a, spec, weights) : (weights[a] || 0);
+    var wb = (b === "hit" || b === "def") ? capAwareWeight(b, spec, weights) : (weights[b] || 0);
+    return wb - wa;
+  });
+  for (var i = 0; i < sorted.length; i++) {
+    var k = sorted[i];
+    var w = (k === "hit" || k === "def") ? capAwareWeight(k, spec, weights) : (weights[k] || 0);
+    if (w === 0) continue;
+    var vA = (item && item.stats && item.stats[k]) ? item.stats[k] : 0;
+    var vB = (refItem && refItem.stats && refItem.stats[k]) ? refItem.stats[k] : 0;
+    // Cap-aware contribution for the cap stat
+    if (k === capKey && capVal && otherCapTotal !== undefined) {
+      var usefulA = Math.max(0, Math.min(vA, capVal - otherCapTotal));
+      var usefulB = Math.max(0, Math.min(vB, capVal - otherCapTotal));
+      var wastedA = vA - usefulA;
+      var wastedB = vB - usefulB;
+      var contribution = Math.round((usefulA - usefulB) * w * 10) / 10;
+      if (usefulA !== usefulB || wastedA !== wastedB) {
+        var sign = contribution > 0 ? '+' : '';
+        var statName = STAT_NAMES[k] || k;
+        var line = sign + contribution.toFixed(1) + '  ' + (vA > vB ? '+' : '') + (vA - vB) + ' ' + statName + ' (x' + w.toFixed(2) + ')';
+        if (wastedA > 0 || wastedB > 0) {
+          line += '&#10;        ' + (wastedA > wastedB ? '+' : '') + (wastedA - wastedB) + ' wasted over cap';
+        }
+        lines.push(line);
+      }
+    } else {
+      var diff = vA - vB;
+      if (diff === 0) continue;
+      var contribution = Math.round(diff * w * 10) / 10;
+      var statName = STAT_NAMES[k] || k;
+      var sign = contribution > 0 ? '+' : '';
+      lines.push(sign + contribution.toFixed(1) + '  ' + (diff > 0 ? '+' : '') + diff + ' ' + statName + ' (x' + w.toFixed(2) + ')');
+    }
+  }
+  if (!lines.length) return '';
+  return lines.join('&#10;');
+}
+
 function computeBisScore() {
   var spec = specData();
   var specSlug = localStorage.getItem("prebis-spec");
@@ -912,7 +1103,11 @@ function renderGearSlot(slotKey) {
 
   if (count > 1) {
     var maxVisible = 5;
-    var topScore = hasStatWeights(currentSpec) ? itemScore(top, currentSpec) : 0;
+    // Cap-aware scoring context
+    var spec = SPECS[currentSpec];
+    var capKey = spec ? (spec.hitCap ? "hit" : (spec.defCap ? "def" : null)) : null;
+    var capVal = spec ? (spec.hitCap || spec.defCap || 0) : 0;
+    var otherCapTotal = (capKey && hasStatWeights(currentSpec)) ? getOtherSlotCapStat(slotKey, capKey, currentSpec, "bis") : 0;
     html += '<div class="slot-alts">';
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
@@ -931,10 +1126,11 @@ function renderGearSlot(slotKey) {
       html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
       html += '</div>';
       if (hasStatWeights(currentSpec)) {
-        var delta = itemScore(it, currentSpec) - topScore;
+        var delta = capKey ? capAwareDelta(it, top, currentSpec, otherCapTotal, capKey, capVal) : (itemScore(it, currentSpec) - itemScore(top, currentSpec));
         var sign = delta > 0 ? '+' : '';
         var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
-        html += '<div class="alt-score ' + cls + '">' + sign + delta.toFixed(1) + '</div>';
+        var tip = scoreBreakdownTooltip(it, top, currentSpec, otherCapTotal, capKey, capVal);
+        html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
       }
       html += '</div>';
     }
@@ -1440,9 +1636,14 @@ function renderMyGearSlot(slotKey) {
   if (hasPendingSwap) html += renderSwapSuggestion(slotKey);
 
   // Expansion content
+  // Cap-aware scoring context for My Gear
+  var mgSpec = SPECS[currentSpec];
+  var mgCapKey = mgSpec ? (mgSpec.hitCap ? "hit" : (mgSpec.defCap ? "def" : null)) : null;
+  var mgCapVal = mgSpec ? (mgSpec.hitCap || mgSpec.defCap || 0) : 0;
+  var mgOtherCap = (mgCapKey && hasStatWeights(currentSpec)) ? getOtherSlotCapStat(slotKey, mgCapKey, currentSpec, "mygear") : 0;
+
   if (hasInventory) {
     // -- Owned items section --
-    var currentScore = hasItem && hasStatWeights(currentSpec) ? itemScore(trackedItem, currentSpec) : 0;
     var maxOwnedVisible = 5;
     html += '<div class="slot-alts">';
     if (ownedMatches.length > 0) {
@@ -1457,10 +1658,11 @@ function renderMyGearSlot(slotKey) {
         html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
         html += '</div>';
         if (hasStatWeights(currentSpec)) {
-          var delta = itemScore(it, currentSpec) - currentScore;
+          var delta = mgCapKey ? capAwareDelta(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal) : (itemScore(it, currentSpec) - itemScore(trackedItem, currentSpec));
           var sign = delta > 0 ? '+' : '';
           var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
-          html += '<div class="alt-score ' + cls + '">' + sign + delta.toFixed(1) + '</div>';
+          var tip = scoreBreakdownTooltip(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal);
+          html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
         }
         html += '</div>';
       }
@@ -2785,16 +2987,20 @@ function importEquippedGear(parsed) {
   }
 
   // Save imported enchants and gems to tracker storage
-  if (Object.keys(importedEnchants).length) {
-    var existingEnch = loadTrackerEnchants();
-    for (var s in importedEnchants) existingEnch[s] = importedEnchants[s];
-    saveTrackerEnchants(existingEnch);
+  // Clear stale data for imported slots, then merge new data
+  var existingEnch = loadTrackerEnchants();
+  var existingGems = loadTrackerGems();
+  for (var si = 0; si < slots.length; si++) {
+    var sl = slots[si];
+    if (!spec.slots[sl]) continue;
+    // Clear old enchant/gem for this slot (import is authoritative)
+    delete existingEnch[sl];
+    delete existingGems[sl];
   }
-  if (Object.keys(importedGems).length) {
-    var existingGems = loadTrackerGems();
-    for (var s in importedGems) existingGems[s] = importedGems[s];
-    saveTrackerGems(existingGems);
-  }
+  for (var s in importedEnchants) existingEnch[s] = importedEnchants[s];
+  for (var s in importedGems) existingGems[s] = importedGems[s];
+  saveTrackerEnchants(existingEnch);
+  saveTrackerGems(existingGems);
 
   console.log('[TZ Import] Done: ' + total + ' items (' + bisCount + ' BiS, ' + customCount + ' custom)');
   console.log('[TZ Import] Enchants saved:', importedEnchants);
