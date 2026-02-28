@@ -45,8 +45,12 @@ function setGemPriceCap(val) {
 
 function loadAhPrices() {
   var raw = localStorage.getItem("prebis-ah-prices");
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch(e) { return null; }
+  if (raw) {
+    try { return JSON.parse(raw); } catch(e) {}
+  }
+  // Fall back to hardcoded default prices
+  if (typeof DEFAULT_AH_PRICES !== "undefined") return DEFAULT_AH_PRICES;
+  return null;
 }
 
 function clearAhPrices() {
@@ -375,14 +379,19 @@ function showFilterModal() {
       else if (craftMatIds[pid]) craftMatCount++;
       else gemCount++;
     }
-    var importAge = ahData.importTime ? Math.floor((Date.now() / 1000 - ahData.importTime) / 86400) : -1;
-    var ageText = importAge === 0 ? 'today' : (importAge === 1 ? '1 day ago' : importAge + ' days ago');
-    var staleClass = importAge > 7 ? ' ah-stale' : '';
+    var isDefault = (typeof DEFAULT_AH_PRICES !== "undefined" && ahData === DEFAULT_AH_PRICES) || !localStorage.getItem("prebis-ah-prices");
     var countText = gemCount + ' gems';
     if (enchMatCount > 0) countText += ', ' + enchMatCount + ' enchant mats';
     if (craftMatCount > 0) countText += ', ' + craftMatCount + ' craft mats';
-    html += '<span class="ah-status-text' + staleClass + '">AH Data: ' + (ahData.server || 'Unknown') + ' (' + countText + ', imported ' + ageText + ')</span>';
-    html += ' <button class="ah-clear-btn" onclick="clearAhPrices()">Clear</button>';
+    if (isDefault) {
+      html += '<span class="ah-status-text">AH Data: ' + (ahData.server || 'Unknown') + ' (' + countText + ', default prices)</span>';
+    } else {
+      var importAge = ahData.importTime ? Math.floor((Date.now() / 1000 - ahData.importTime) / 86400) : -1;
+      var ageText = importAge === 0 ? 'today' : (importAge === 1 ? '1 day ago' : importAge + ' days ago');
+      var staleClass = importAge > 7 ? ' ah-stale' : '';
+      html += '<span class="ah-status-text' + staleClass + '">AH Data: ' + (ahData.server || 'Unknown') + ' (' + countText + ', imported ' + ageText + ')</span>';
+      html += ' <button class="ah-clear-btn" onclick="clearAhPrices()">Clear</button>';
+    }
   } else {
     html += '<span class="ah-status-text ah-no-data">AH Data: None — import via /tz addon with Auctionator</span>';
   }
