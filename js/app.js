@@ -185,14 +185,14 @@ function getActiveBisGems(specSlug) {
   return result;
 }
 
-function getActiveBisEnchant(specSlug, slotKey) {
+function getActiveBisEnchant(specSlug, slotKey, skipBudget) {
   var bisEnchants = BIS_ENCHANTS[specSlug];
   if (!bisEnchants) return null;
   var enchId = bisEnchants[slotKey];
   if (!enchId) return null;
   // Ring enchants require Enchanting profession
   if ((slotKey === "ring1" || slotKey === "ring2") && loadProfessions().indexOf("Enchanting") === -1) return null;
-  if (!isBudgetMode()) return enchId;
+  if (skipBudget || !isBudgetMode()) return enchId;
 
   // Hardcoded budget swaps (shoulders, legs, feet, weapon, rings)
   if (typeof BUDGET_ENCHANT_MAP !== "undefined" && (enchId in BUDGET_ENCHANT_MAP)) {
@@ -874,7 +874,24 @@ function specSlots() {
 
 function bisItem(slotKey) {
   var items = getOrderedItems(slotKey);
-  return items && items.length ? items[0] : null; // rank 1
+  if (!items || !items.length) return null;
+  // For paired slots (ring2, trinket2), skip the item used by slot 1
+  if (slotKey === "ring2" || slotKey === "trinket2") {
+    var slot1 = slotKey === "ring2" ? "ring1" : "trinket1";
+    var slot1Items = getOrderedItems(slot1);
+    var excludeId = null;
+    if (slot1Items) {
+      for (var k = 0; k < slot1Items.length; k++) {
+        if (!isItemFiltered(slot1Items[k])) { excludeId = slot1Items[k].id; break; }
+      }
+    }
+    if (excludeId) {
+      for (var j = 0; j < items.length; j++) {
+        if (items[j].id !== excludeId && !isItemFiltered(items[j])) return items[j];
+      }
+    }
+  }
+  return items[0];
 }
 
 function setRankingSource(src) {
@@ -1033,9 +1050,9 @@ function getItemFullStats(item, specSlug, slotKey) {
   if (bisGems && item.sockets) {
     addStats(stats, bestGemContribution(item, bisGems, specSlug));
   }
-  // Enchant
+  // Enchant (always true BiS for consistent scoring)
   if (slotKey) {
-    var enchId = getActiveBisEnchant(specSlug, slotKey);
+    var enchId = getActiveBisEnchant(specSlug, slotKey, true);
     if (enchId) {
       var ench = findEnchantById(slotKey, enchId);
       if (ench && ench.stats) addStats(stats, ench.stats);
@@ -1147,12 +1164,12 @@ function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
         if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
       }
     } else {
-      // BiS mode: use best gem strategy + budget-aware enchants
+      // BiS mode: use best gem strategy + true BiS enchants
       if (bisGems && item && item.sockets) {
         var gemContrib = bestGemContribution(item, bisGems, specSlug);
         if (gemContrib[capKey]) total += gemContrib[capKey];
       }
-      var enchId = getActiveBisEnchant(specSlug, sk);
+      var enchId = getActiveBisEnchant(specSlug, sk, true);
       if (enchId) {
         var ench = findEnchantById(sk, enchId);
         if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
@@ -1384,7 +1401,7 @@ function renderBisGemsEnchants(slotKey, item) {
   var bisEnchants = BIS_ENCHANTS[specSlug];
   var hasGems = item.sockets && item.sockets.length && bisGems;
   var ench = null;
-  var activeEnchId = getActiveBisEnchant(specSlug, slotKey);
+  var activeEnchId = getActiveBisEnchant(specSlug, slotKey, true);
   if (activeEnchId) ench = findEnchantById(slotKey, activeEnchId);
   if (!hasGems && !ench) return '';
 
@@ -1430,11 +1447,24 @@ function renderBisGemsEnchants(slotKey, item) {
 function renderGearSlot(slotKey) {
   var allItems = getOrderedItems(slotKey);
   if (!allItems || !allItems.length) return "";
-  // Filter items but always keep the #1 BiS
-  var items = [allItems[0]];
-  for (var f = 1; f < allItems.length; f++) {
-    if (!isItemFiltered(allItems[f])) items.push(allItems[f]);
+  // For paired slots (ring2, trinket2), exclude ring1/trinket1's top pick
+  var excludeId = null;
+  if (slotKey === "ring2" || slotKey === "trinket2") {
+    var slot1 = slotKey === "ring2" ? "ring1" : "trinket1";
+    var slot1Items = getOrderedItems(slot1);
+    if (slot1Items) {
+      for (var k = 0; k < slot1Items.length; k++) {
+        if (!isItemFiltered(slot1Items[k])) { excludeId = slot1Items[k].id; break; }
+      }
+    }
   }
+  // Filter items but always keep the #1 (after exclusion)
+  var items = [];
+  for (var f = 0; f < allItems.length; f++) {
+    if (allItems[f].id === excludeId) continue;
+    if (items.length === 0 || !isItemFiltered(allItems[f])) items.push(allItems[f]);
+  }
+  if (!items.length) items = [allItems[0]];
   var top = items[0];
   var label = SLOT_LABELS[slotKey] || slotKey;
   var qc = qualityClass(top.q);
@@ -1566,7 +1596,7 @@ function computeBisStats() {
     }
   }
 
-  // Add BiS enchant stats (respects profession filters via getActiveBisEnchant)
+  // Add BiS enchant stats (true BiS, not budget — respects profession filters)
   var bisEnchants = BIS_ENCHANTS[specSlug];
   if (bisEnchants) {
     var enchSlots = Object.keys(bisEnchants);
@@ -1575,7 +1605,7 @@ function computeBisStats() {
       // Skip weapon enchants using same logic as items
       if (eSlot === "twohand" && hasMainhand) continue;
       if ((eSlot === "mainhand" || eSlot === "offhand") && hasTwohand && !hasMainhand) continue;
-      var activeEnchId = getActiveBisEnchant(specSlug, eSlot);
+      var activeEnchId = getActiveBisEnchant(specSlug, eSlot, true);
       if (!activeEnchId) continue;
       var ench = findEnchantById(eSlot, activeEnchId);
       if (ench && ench.stats) addStats(stats, ench.stats);

@@ -237,7 +237,8 @@ var ENCHANTS = {
     {id:34007,name:"Cat's Swiftness",stats:{agi:6},src:"Enchanting",note:"+8% run speed"},
     {id:34008,name:"Boar's Speed",stats:{stam:9},src:"Enchanting",note:"+8% run speed"},
     {id:27951,name:"Dexterity",stats:{agi:12},src:"Enchanting"},
-    {id:27954,name:"Vitality",stats:{},src:"Enchanting",note:"+4 hp/mp5"}
+    {id:27948,name:"Vitality",stats:{mp5:4},src:"Enchanting",note:"+4 hp5 too"},
+    {id:27954,name:"Surefooted",stats:{hit:10},src:"Enchanting",note:"+5% root/snare resist"}
   ],
   mainhand:[
     {id:27975,name:"Major Spellpower",stats:{sp:40},src:"Enchanting"},
@@ -364,9 +365,7 @@ var BUDGET_ENCHANT_MAP = {
   31372: 31373,  // Runic Spellthread → Mystic Spellthread
   29535: 29533,  // Nethercobra Leg Armor → Cobrahide Leg Armor
   29536: 29534,  // Nethercleft Leg Armor → Clefthide Leg Armor
-  // Feet: run-speed enchants → raw stat enchants
-  34007: 27951,  // Cat's Swiftness (agi:6 + speed) → Dexterity (agi:12)
-  34008: 27954,  // Boar's Speed (stam:9 + speed) → Vitality (+4 hp/mp5)
+  // Feet: handled by price-based system (spec-aware via stat weights)
   // Weapon: expensive → cheaper
   27984: 46538,  // Mongoose (proc) → Greater Agility (agi:20)
   // Rings: skip entirely (require 360 Enchanting)
@@ -438,6 +437,8 @@ var ENCHANT_COSTS = {
   34007: {type:"mats",mats:[[22449,8],[22451,8]]},               // Cat's Swiftness
   34008: {type:"mats",mats:[[22449,8],[22452,8]]},               // Boar's Speed
   27951: {type:"mats",mats:[[22446,8],[22445,8]]},               // Dexterity
+  27948: {type:"mats",mats:[[22445,6]]},                         // Vitality (+ 4 potions, ~vendor cost)
+  27954: {type:"mats",mats:[[22450,2],[22449,4],[23572,1]]},     // Surefooted
   // Mainhand weapon
   27975: {type:"mats",mats:[[22449,8],[22446,8]]},               // Major Spellpower
   27984: {type:"mats",mats:[[22450,6],[22449,10],[22446,8],[22445,40]]}, // Mongoose
