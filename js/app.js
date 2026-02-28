@@ -188,9 +188,34 @@ function getActiveBisEnchant(specSlug, slotKey) {
   if (!enchId) return null;
   // Ring enchants require Enchanting profession
   if ((slotKey === "ring1" || slotKey === "ring2") && loadProfessions().indexOf("Enchanting") === -1) return null;
-  if (!isBudgetMode() || typeof BUDGET_ENCHANT_MAP === "undefined") return enchId;
-  if (!(enchId in BUDGET_ENCHANT_MAP)) return enchId;
-  return BUDGET_ENCHANT_MAP[enchId]; // null means skip
+  if (!isBudgetMode()) return enchId;
+
+  // Hardcoded budget swaps (shoulders, legs, feet, weapon, rings)
+  if (typeof BUDGET_ENCHANT_MAP !== "undefined" && (enchId in BUDGET_ENCHANT_MAP)) {
+    return BUDGET_ENCHANT_MAP[enchId]; // null means skip
+  }
+
+  // Price-based: pick cheapest enchant for this slot
+  var slotEnchants = ENCHANTS[slotKey];
+  if (typeof slotEnchants === "string") slotEnchants = ENCHANTS[slotEnchants];
+  if (!slotEnchants || !slotEnchants.length) return enchId;
+
+  var ahPrices = loadAhPrices();
+  var bisCost = getEnchantCost(enchId, ahPrices);
+  var cheapestId = null;
+  var cheapestCost = Infinity;
+
+  for (var i = 0; i < slotEnchants.length; i++) {
+    var cost = getEnchantCost(slotEnchants[i].id, ahPrices);
+    if (cost !== null && cost < cheapestCost) {
+      cheapestCost = cost;
+      cheapestId = slotEnchants[i].id;
+    }
+  }
+
+  // Only swap if actually cheaper than BiS
+  if (cheapestId && bisCost !== null && cheapestCost < bisCost) return cheapestId;
+  return enchId;
 }
 
 // ---------------------------------------------------------------------------
@@ -1995,7 +2020,15 @@ function renderMyGearSlot(slotKey) {
         html += '<div class="alt-info">';
         html += '<div class="alt-name">' + itemLink(it) + '</div>';
         html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
-        html += '</div></div>';
+        html += '</div>';
+        if (hasItem && hasStatWeights(currentSpec)) {
+          var delta = mgCapKey ? capAwareDelta(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey) : (fullItemScore(it, currentSpec, slotKey) - fullItemScore(trackedItem, currentSpec, slotKey));
+          var sign = delta > 0 ? '+' : '';
+          var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
+          var tip = scoreBreakdownTooltip(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey);
+          html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
+        }
+        html += '</div>';
       }
       if (limit > maxUpgradeVisible) {
         html += '<button class="load-more-btn" onclick="event.stopPropagation();loadMoreAlts(this)">Show ' + (limit - maxUpgradeVisible) + ' more</button>';
@@ -2017,7 +2050,15 @@ function renderMyGearSlot(slotKey) {
       html += '<div class="alt-info">';
       html += '<div class="alt-name">' + itemLink(it) + '</div>';
       html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
-      html += '</div></div>';
+      html += '</div>';
+      if (hasItem && hasStatWeights(currentSpec)) {
+        var delta = mgCapKey ? capAwareDelta(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey) : (fullItemScore(it, currentSpec, slotKey) - fullItemScore(trackedItem, currentSpec, slotKey));
+        var sign = delta > 0 ? '+' : '';
+        var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
+        var tip = scoreBreakdownTooltip(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey);
+        html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
+      }
+      html += '</div>';
     }
     if (limit > maxVisible) {
       html += '<button class="load-more-btn" onclick="event.stopPropagation();loadMoreAlts(this)">Show ' + (limit - maxVisible) + ' more</button>';
