@@ -987,20 +987,23 @@ function itemScore(item, specSlug) {
   return Math.round(score * 10) / 10;
 }
 
-// Build combined stats: base item + BiS gems + socket bonus + enchant
-// Evaluate both gem strategies and return the contribution from the better one.
+// Evaluate both gem strategies and return the optimal gem assignment for an item.
 // Strategy 1: match socket colors → get socket bonus.
 // Strategy 2: jam the single highest-scoring gem in every non-meta socket → skip bonus.
-function bestGemContribution(item, bisGems, specSlug) {
-  if (!item.sockets || item.sockets.length === 0) return {};
+// Returns { gems: [gemId, ...], stats: {}, matched: bool }
+function getOptimalGems(item, bisGems, specSlug) {
+  var empty = { gems: [], stats: {}, matched: false };
+  if (!item.sockets || item.sockets.length === 0) return empty;
 
   // Strategy 1: color-matched
+  var matchGems = [];
   var matchStats = {};
   var allMatch = true;
   for (var i = 0; i < item.sockets.length; i++) {
     var sc = item.sockets[i];
     var gemId = bisGems[sc];
     var gem = gemId ? GEMS[gemId] : null;
+    matchGems.push(gemId || null);
     if (gem && gem.stats) addStats(matchStats, gem.stats);
     if (!gem || !gemFits(gem.color, sc)) allMatch = false;
   }
@@ -1008,29 +1011,33 @@ function bestGemContribution(item, bisGems, specSlug) {
 
   // Strategy 2: jam best single gem everywhere (except meta)
   var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
-  if (!weights) return matchStats;
+  if (!weights) return { gems: matchGems, stats: matchStats, matched: allMatch };
   var colors = ["red", "orange", "yellow", "green", "blue", "purple"];
+  var bestGemId = null;
   var bestGemStats = null;
   var bestGemScore = -1;
   for (var c = 0; c < colors.length; c++) {
     var gid = bisGems[colors[c]];
     var g = gid ? GEMS[gid] : null;
     if (!g || !g.stats) continue;
-    var sc = 0;
+    var sc2 = 0;
     var ks = Object.keys(g.stats);
-    for (var j = 0; j < ks.length; j++) sc += (weights[ks[j]] || 0) * g.stats[ks[j]];
-    if (sc > bestGemScore) { bestGemScore = sc; bestGemStats = g.stats; }
+    for (var j = 0; j < ks.length; j++) sc2 += (weights[ks[j]] || 0) * g.stats[ks[j]];
+    if (sc2 > bestGemScore) { bestGemScore = sc2; bestGemId = gid; bestGemStats = g.stats; }
   }
-  if (!bestGemStats) return matchStats;
+  if (!bestGemStats) return { gems: matchGems, stats: matchStats, matched: allMatch };
 
+  var jamGems = [];
   var jamStats = {};
   for (var i = 0; i < item.sockets.length; i++) {
     var sc = item.sockets[i];
     if (sc === "meta") {
       var metaId = bisGems.meta;
       var meta = metaId ? GEMS[metaId] : null;
+      jamGems.push(metaId || null);
       if (meta && meta.stats) addStats(jamStats, meta.stats);
     } else {
+      jamGems.push(bestGemId);
       addStats(jamStats, bestGemStats);
     }
   }
@@ -1038,7 +1045,13 @@ function bestGemContribution(item, bisGems, specSlug) {
   // Pick whichever scores higher
   var matchScore = itemScore({ stats: matchStats }, specSlug);
   var jamScore = itemScore({ stats: jamStats }, specSlug);
-  return matchScore >= jamScore ? matchStats : jamStats;
+  if (matchScore >= jamScore) return { gems: matchGems, stats: matchStats, matched: allMatch };
+  return { gems: jamGems, stats: jamStats, matched: false };
+}
+
+// Backwards-compatible wrapper returning just the stats contribution
+function bestGemContribution(item, bisGems, specSlug) {
+  return getOptimalGems(item, bisGems, specSlug).stats;
 }
 
 function getItemFullStats(item, specSlug, slotKey) {
@@ -1392,7 +1405,7 @@ function craftCostSpan(item) {
 
 function renderBisGemsEnchants(slotKey, item) {
   var specSlug = localStorage.getItem("prebis-spec");
-  var bisGems = BIS_GEMS[specSlug];
+  var bisGems = getActiveBisGems(specSlug);
   var bisEnchants = BIS_ENCHANTS[specSlug];
   var hasGems = item.sockets && item.sockets.length && bisGems;
   var ench = null;
@@ -1402,15 +1415,14 @@ function renderBisGemsEnchants(slotKey, item) {
 
   var html = '<div class="ge-row">';
 
-  // Gem dots
+  // Gem dots — use optimal gem assignment (match vs jam)
   if (hasGems) {
     html += '<span class="ge-gems">';
-    var matched = allSocketsMatched(item, bisGems);
+    var optimal = getOptimalGems(item, bisGems, specSlug);
     for (var s = 0; s < item.sockets.length; s++) {
-      var sc = item.sockets[s];
-      var gemId = bisGems[sc];
+      var gemId = optimal.gems[s];
       var gem = gemId ? GEMS[gemId] : null;
-      var gemColor = gem ? gem.color : sc;
+      var gemColor = gem ? gem.color : item.sockets[s];
       var tip = gemTooltipText(gem, gemId);
       html += '<span class="gem-socket ' + gemColor + ' filled" title="' + tip.replace(/"/g, '&quot;') + '"></span>';
     }
@@ -1421,7 +1433,7 @@ function renderBisGemsEnchants(slotKey, item) {
         var sn = STAT_NAMES[bkeys[b]] || bkeys[b];
         bonusParts.push('+' + item.socketBonus[bkeys[b]] + ' ' + sn);
       }
-      html += '<span class="socket-bonus' + (matched ? ' active' : '') + '">' + bonusParts.join(', ') + '</span>';
+      html += '<span class="socket-bonus' + (optimal.matched ? ' active' : '') + '">' + bonusParts.join(', ') + '</span>';
     }
     html += '</span>';
   }
@@ -1567,6 +1579,7 @@ function computeBisStats() {
   // Avoid double-counting weapons: prefer mainhand+offhand over twohand
   var hasMainhand = !!spec.slots["mainhand"];
   var hasTwohand = !!spec.slots["twohand"];
+  var bisGems = getActiveBisGems(specSlug);
   for (var i = 0; i < slotKeys.length; i++) {
     var sk = slotKeys[i];
     if (sk === "twohand" && hasMainhand) continue;
@@ -1575,19 +1588,9 @@ function computeBisStats() {
     if (!item || !item.stats) continue;
     addStats(stats, item.stats);
 
-    // Add BiS gem stats for this item
-    var bisGems = BIS_GEMS[specSlug];
+    // Add BiS gem stats for this item (optimal: match vs jam)
     if (bisGems && item.sockets) {
-      for (var s = 0; s < item.sockets.length; s++) {
-        var socketColor = item.sockets[s];
-        var gemId = bisGems[socketColor];
-        var gem = gemId ? GEMS[gemId] : null;
-        if (gem && gem.stats) addStats(stats, gem.stats);
-      }
-      // Add socket bonus if all sockets matched
-      if (item.socketBonus && allSocketsMatched(item, bisGems)) {
-        addStats(stats, item.socketBonus);
-      }
+      addStats(stats, bestGemContribution(item, bisGems, specSlug));
     }
   }
 

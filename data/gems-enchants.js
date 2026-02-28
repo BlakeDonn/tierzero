@@ -69,6 +69,7 @@ var GEMS = {
   24037:{name:"Lustrous Star of Elune",color:"blue",stats:{mp5:3}},
   24035:{name:"Sparkling Star of Elune",color:"blue",stats:{spi:8}},
   24039:{name:"Stormy Star of Elune",color:"blue",stats:{}},
+  32836:{name:"Purified Shadow Pearl",color:"blue",stats:{heal:9,sp:3,spi:4}},
   // ===== UNCOMMON BLUE (Azure Moonstone) =====
   23118:{name:"Solid Azure Moonstone",color:"blue",stats:{stam:9}},
   23121:{name:"Lustrous Azure Moonstone",color:"blue",stats:{mp5:2}},
@@ -138,20 +139,27 @@ var ENCHANT_LINK_MAP = {
   2621:25084, // Subtlety
   2938:34004, // Spell Penetration
   2622:34003, // Greater Agility
+  2620:27962, // Major Resistance
+  2623:25086, // Dodge
   // Chest
   2661:27960, // Exceptional Stats
   2659:33990, // Major Spirit
   3233:46594, // Defense
+  2660:27957, // Exceptional Health
+  2639:33991, // Restore Mana Prime
   // Wrists
   2650:27917, // Spellpower
   2654:34001, // Major Intellect
   2647:27914, // Fortitude
   2648:34002, // Assault
+  2646:27899, // Brawn
   // Hands
   2937:33997, // Major Spellpower
   2564:33995, // Major Strength
   2614:25080, // Superior Agility
   2613:33996, // Assault
+  2615:25072, // Threat
+  2617:33999, // Major Healing
   // Legs
   2748:31372, // Runic Spellthread
   2745:29535, // Nethercobra Leg Armor
@@ -163,14 +171,20 @@ var ENCHANT_LINK_MAP = {
   2649:27951, // Dexterity
   2656:27948, // Vitality
   2658:27954, // Surefooted
+  2655:27950, // Fortitude (boots)
   // Weapon
   2669:27975, // Major Spellpower
   2673:27984, // Mongoose
   1900:20034, // Crusader
   2670:46538, // Greater Agility (1H)
   2667:27967, // Major Striking
+  2672:27981, // Sunfire
+  2668:27982, // Soulfrost
+  2343:34010, // Major Healing
+  2663:27968, // Major Intellect (weapon)
   // 2H Weapon
-  2671:27977, // Major Agility (2H) -- actually Sunfire, needs verify
+  2671:27977, // Major Agility (2H)
+  2443:27971, // Savagery (2H)
   // Rings
   2928:27927, // Spellpower
   2929:27926, // Healing Power
@@ -204,18 +218,23 @@ var ENCHANTS = {
   back:[
     {id:25084,name:"Enchant Cloak - Subtlety",stats:{},src:"Enchanting",note:"-2% threat"},
     {id:34004,name:"Enchant Cloak - Spell Penetration",stats:{},src:"Enchanting"},
-    {id:34003,name:"Enchant Cloak - Greater Agility",stats:{agi:12},src:"Enchanting"}
+    {id:34003,name:"Enchant Cloak - Greater Agility",stats:{agi:12},src:"Enchanting"},
+    {id:27962,name:"Enchant Cloak - Major Resistance",stats:{},src:"Enchanting",note:"+7 all resistances"},
+    {id:25086,name:"Enchant Cloak - Dodge",stats:{dodge:12},src:"Enchanting"}
   ],
   chest:[
     {id:27960,name:"Exceptional Stats",stats:{str:6,agi:6,int:6,stam:6,spi:6},src:"Enchanting"},
     {id:33990,name:"Major Spirit",stats:{spi:15},src:"Enchanting"},
-    {id:46594,name:"Defense",stats:{def:15},src:"Enchanting"}
+    {id:46594,name:"Defense",stats:{def:15},src:"Enchanting"},
+    {id:27957,name:"Exceptional Health",stats:{stam:15},src:"Enchanting"},
+    {id:33991,name:"Restore Mana Prime",stats:{mp5:6},src:"Enchanting"}
   ],
   wrists:[
     {id:27917,name:"Enchant Bracer - Spellpower",stats:{sp:15},src:"Enchanting"},
     {id:34001,name:"Enchant Bracer - Major Intellect",stats:{int:12},src:"Enchanting"},
     {id:27914,name:"Enchant Bracer - Fortitude",stats:{stam:12},src:"Enchanting"},
-    {id:34002,name:"Enchant Bracer - Assault",stats:{ap:24},src:"Enchanting"}
+    {id:34002,name:"Enchant Bracer - Assault",stats:{ap:24},src:"Enchanting"},
+    {id:27899,name:"Enchant Bracer - Brawn",stats:{str:12},src:"Enchanting"}
   ],
   hands:[
     {id:33997,name:"Major Spellpower",stats:{sp:20},src:"Enchanting"},
@@ -223,7 +242,9 @@ var ENCHANTS = {
     {id:25080,name:"Superior Agility",stats:{agi:15},src:"Enchanting"},
     {id:33996,name:"Assault",stats:{ap:26},src:"Enchanting"},
     {id:33993,name:"Blasting",stats:{crit:10},src:"Enchanting"},
-    {id:33994,name:"Spell Strike",stats:{hit:15},src:"Enchanting"}
+    {id:33994,name:"Spell Strike",stats:{hit:15},src:"Enchanting"},
+    {id:25072,name:"Threat",stats:{},src:"Enchanting",note:"+2% threat"},
+    {id:33999,name:"Major Healing",stats:{heal:35},src:"Enchanting"}
   ],
   waist:[],
   legs:[
@@ -239,21 +260,29 @@ var ENCHANTS = {
     {id:34008,name:"Boar's Speed",stats:{stam:9},src:"Enchanting",note:"+8% run speed"},
     {id:27951,name:"Dexterity",stats:{agi:12},src:"Enchanting"},
     {id:27948,name:"Vitality",stats:{mp5:4},src:"Enchanting",note:"+4 hp5 too"},
-    {id:27954,name:"Surefooted",stats:{hit:10},src:"Enchanting",note:"+5% root/snare resist"}
+    {id:27954,name:"Surefooted",stats:{hit:10},src:"Enchanting",note:"+5% root/snare resist"},
+    {id:27950,name:"Fortitude",stats:{stam:12},src:"Enchanting"}
   ],
   mainhand:[
     {id:27975,name:"Major Spellpower",stats:{sp:40},src:"Enchanting"},
+    {id:27981,name:"Sunfire",stats:{sp:50},src:"Enchanting",note:"Fire/Arcane damage only"},
+    {id:27982,name:"Soulfrost",stats:{sp:54},src:"Enchanting",note:"Shadow/Frost damage only"},
+    {id:34010,name:"Major Healing",stats:{heal:81},src:"Enchanting"},
     {id:27984,name:"Mongoose",stats:{},src:"Enchanting",note:"Agi+haste proc"},
     {id:20034,name:"Crusader",stats:{},src:"Enchanting",note:"+100 str proc"},
     {id:46538,name:"Greater Agility",stats:{agi:20},src:"Enchanting"},
-    {id:27967,name:"Major Striking",stats:{},src:"Enchanting",note:"+7 weapon damage"}
+    {id:27967,name:"Major Striking",stats:{},src:"Enchanting",note:"+7 weapon damage"},
+    {id:27968,name:"Major Intellect",stats:{int:30},src:"Enchanting"}
   ],
   twohand:[
     {id:27971,name:"Savagery",stats:{ap:70},src:"Enchanting"},
     {id:27977,name:"Major Agility",stats:{agi:35},src:"Enchanting"},
     {id:27984,name:"Mongoose",stats:{},src:"Enchanting",note:"Agi+haste proc"},
     {id:27975,name:"Major Spellpower",stats:{sp:40},src:"Enchanting"},
-    {id:27968,name:"Major Intellect",stats:{int:30},src:"Enchanting"}
+    {id:27981,name:"Sunfire",stats:{sp:50},src:"Enchanting",note:"Fire/Arcane damage only"},
+    {id:27982,name:"Soulfrost",stats:{sp:54},src:"Enchanting",note:"Shadow/Frost damage only"},
+    {id:27968,name:"Major Intellect",stats:{int:30},src:"Enchanting"},
+    {id:46538,name:"Greater Agility",stats:{agi:20},src:"Enchanting"}
   ],
   offhand:"mainhand",
   wand:[
@@ -271,68 +300,68 @@ var ENCHANTS = {
 // BiS Gem Recommendations (per spec)
 // ---------------------------------------------------------------------------
 var BIS_GEMS = {
-  "fire-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
   "arcane-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
+  "fire-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
   "frost-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "shadow-priest":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "holy-priest":{meta:25901,red:24029,yellow:24065,blue:24037},
-  "discipline-priest":{meta:25901,red:24029,yellow:24065,blue:24037},
+  "holy-paladin":{meta:25901,red:24029,yellow:24047,blue:24057},
+  "prot-paladin":{meta:25896,red:24030,yellow:31867,blue:24033},
+  "ret-paladin":{meta:32409,red:24027,yellow:24058,blue:24054},
+  "fury-warrior":{meta:32409,red:24058,yellow:24058,blue:24054},
+  "arms-warrior":{meta:32409,red:24058,yellow:24058,blue:24054},
+  "prot-warrior":{meta:25896,red:24033,yellow:24033,blue:24033},
+  "bm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "mm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "survival-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "combat-rogue":{meta:32409,red:24028,yellow:24061,blue:24055},
+  "assassination-rogue":{meta:32409,red:24028,yellow:24061,blue:24055},
+  "subtlety-rogue":{meta:32409,red:24028,yellow:24061,blue:24055},
+  "shadow-priest":{meta:25893,red:24030,yellow:24056,blue:24059},
+  "holy-priest":{meta:25901,red:24029,yellow:24060,blue:32836},
+  "discipline-priest":{meta:25901,red:24029,yellow:24060,blue:32836},
+  "elemental-shaman":{meta:34220,red:24030,yellow:24059,blue:24056},
+  "enhancement-shaman":{meta:32409,red:24027,yellow:24058,blue:24054},
+  "resto-shaman":{meta:25897,red:24029,yellow:35315,blue:24057},
   "affliction-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
   "destruction-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
   "demonology-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "elemental-shaman":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "enhancement-shaman":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "resto-shaman":{meta:25901,red:24029,yellow:24065,blue:24037},
   "balance-druid":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "resto-druid":{meta:25901,red:24029,yellow:24065,blue:24037},
-  "feral-cat-druid":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "feral-bear-druid":{meta:25896,red:24028,yellow:24062,blue:24033},
-  "fury-warrior":{meta:32409,red:24027,yellow:31868,blue:24054},
-  "arms-warrior":{meta:32409,red:24027,yellow:31868,blue:24054},
-  "prot-warrior":{meta:25896,red:24028,yellow:24062,blue:24033},
-  "ret-paladin":{meta:32409,red:24027,yellow:31868,blue:24054},
-  "prot-paladin":{meta:25901,red:24028,yellow:24062,blue:24033},
-  "holy-paladin":{meta:25901,red:24029,yellow:24065,blue:24037},
-  "combat-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "assassination-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "subtlety-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "bm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "mm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
-  "survival-hunter":{meta:32409,red:24028,yellow:31868,blue:24055}
+  "feral-cat-druid":{red:24028,yellow:24061,blue:24055,meta:32409},
+  "feral-bear-druid":{meta:32409,red:24028,yellow:24061,blue:24055},
+  "resto-druid":{meta:25897,red:24029,yellow:24060,blue:32836},
 };
 
 // ---------------------------------------------------------------------------
 // BiS Enchant Recommendations (per spec)
 // ---------------------------------------------------------------------------
 var BIS_ENCHANTS = {
-  "fire-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,twohand:27975,ring1:27927,ring2:27927},
-  "arcane-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,twohand:27975,ring1:27927,ring2:27927},
-  "frost-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27927,ring2:27927},
-  "shadow-priest":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27927,ring2:27927},
-  "holy-priest":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
-  "discipline-priest":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
-  "affliction-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27927,ring2:27927},
-  "destruction-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27927,ring2:27927},
-  "demonology-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27927,ring2:27927},
-  "elemental-shaman":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975},
-  "enhancement-shaman":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33996,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "resto-shaman":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975},
-  "balance-druid":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,twohand:27975,ring1:27927,ring2:27927},
-  "resto-druid":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
-  "feral-cat-druid":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27984},
-  "feral-bear-druid":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,twohand:27984},
-  "fury-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "arms-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27984},
-  "prot-warrior":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,mainhand:27984},
-  "ret-paladin":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27984},
-  "prot-paladin":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:33997,legs:29536,feet:34008,mainhand:27975},
-  "holy-paladin":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
-  "combat-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "assassination-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "subtlety-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "bm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260},
-  "mm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260},
-  "survival-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260}
+  "arcane-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "fire-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "frost-mage":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "holy-paladin":{head:29189,shoulders:28909,back:27962,chest:27960,wrists:34001,hands:33999,legs:31372,feet:34008,mainhand:27968,ring1:27926,ring2:27926},
+  "prot-paladin":{head:29186,shoulders:28889,back:25086,chest:27957,wrists:27917,hands:25072,legs:31372,feet:27950,mainhand:27975,ring1:27924,ring2:27924},
+  "ret-paladin":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:27899,hands:33995,legs:29535,feet:27951,twohand:27984,ring1:27927,ring2:27927},
+  "fury-warrior":{head:29192,shoulders:23545,back:34004,chest:27960,wrists:27899,hands:33995,legs:29535,feet:34007,mainhand:27984,offhand:27984,wand:30260,ring1:27927,ring2:27927},
+  "arms-warrior":{head:29192,shoulders:23545,back:34004,chest:27960,wrists:27899,hands:33995,legs:29535,feet:34007,wand:30260,ring1:27927,ring2:27927,twohand:27984},
+  "prot-warrior":{head:29186,shoulders:28889,back:34004,chest:27960,wrists:27914,hands:25072,legs:29536,feet:34008,mainhand:27984,wand:30260,ring1:27927,ring2:27927},
+  "bm-hunter":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:46538,wand:30260,ring1:27927,ring2:27927},
+  "mm-hunter":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:46538,wand:30260,ring1:27927,ring2:27927},
+  "survival-hunter":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:46538,wand:30260,ring1:27927,ring2:27927},
+  "combat-rogue":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984,wand:30260,ring1:27927,ring2:27927},
+  "assassination-rogue":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984,wand:30260,ring1:27927,ring2:27927},
+  "subtlety-rogue":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984,wand:30260,ring1:27927,ring2:27927},
+  "shadow-priest":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,mainhand:27982,twohand:27982,ring1:27924,ring2:27924},
+  "holy-priest":{head:29189,shoulders:28909,back:27962,chest:27960,wrists:27917,hands:33999,legs:31372,feet:34008,mainhand:34010,ring1:27926,ring2:27926},
+  "discipline-priest":{head:29189,shoulders:28909,back:27962,chest:27960,wrists:27917,hands:33999,legs:31372,feet:34008,mainhand:34010,ring1:27926,ring2:27926},
+  "elemental-shaman":{head:29191,shoulders:28886,back:34003,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,mainhand:27975,ring1:27924,ring2:27924},
+  "enhancement-shaman":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:27899,hands:33995,legs:29535,feet:34007,mainhand:27984,offhand:27984,ring1:27927,ring2:27927},
+  "resto-shaman":{head:29189,shoulders:28909,back:25084,chest:33991,wrists:27917,hands:33999,legs:31372,feet:34008,mainhand:34010,ring1:27926,ring2:27926},
+  "affliction-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33994,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "destruction-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33994,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "demonology-warlock":{head:29191,shoulders:28886,back:25084,chest:27960,wrists:27917,hands:33994,legs:31372,feet:34008,mainhand:27981,twohand:27981,ring1:27924,ring2:27924},
+  "balance-druid":{head:29191,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34008,twohand:27981,ring1:27927,ring2:27927},
+  "feral-cat-druid":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977,ring1:27927,ring2:27927},
+  "feral-bear-druid":{head:29192,shoulders:28888,back:34004,chest:27960,wrists:27914,hands:25072,legs:29536,feet:34008,twohand:27977,ring1:27927,ring2:27927},
+  "resto-druid":{head:29189,shoulders:28909,back:25084,chest:33990,wrists:27917,hands:33999,legs:31372,feet:34008,mainhand:34010,ring1:27926,ring2:27926},
 };
 
 // ---------------------------------------------------------------------------
@@ -347,6 +376,10 @@ var BUDGET_GEM_MAP = {
   // Orange: Noble Topaz → Flame Spessarite
   24059: 23101,  // Potent: sp:5,crit:4 → sp:4,crit:3
   24058: 23098,  // Inscribed: str:4,crit:4 → str:3,crit:3
+  24061: 23100,  // Glinting: agi:4,hit:4 → agi:3,hit:3
+  24060: 23099,  // Luminous: heal:9,int:4 → heal:7,int:3
+  31867: 31866,  // Veiled: sp:5,hit:4 → sp:4,hit:3
+  31868: 31869,  // Wicked: ap:8,crit:4 → ap:6,crit:3
   // Yellow: Dawnstone → Golden Draenite
   24048: 23114,  // Smooth: crit:8 → crit:6
   24047: 23113,  // Brilliant: int:8 → int:6
@@ -357,6 +390,7 @@ var BUDGET_GEM_MAP = {
   24056: 23108,  // Glowing: sp:5,stam:6 → sp:4,stam:4
   24054: 23111,  // Sovereign: str:4,stam:6 → str:3,stam:4
   24055: 23110,  // Shifting: agi:4,stam:6 → agi:3,stam:4
+  24057: 23109,  // Royal: heal:9,mp5:2 → heal:7,mp5:1
   // Green: Talasite → Deep Peridot
   24062: 23105   // Enduring: def:4,stam:6 → def:3,stam:4
 };
@@ -424,15 +458,20 @@ var ENCHANT_COSTS = {
   25084: {type:"mats",mats:[[22448,4],[22446,2],[22456,8]]},     // Subtlety
   34004: {type:"mats",mats:[[22446,2],[22445,6],[22457,2]]},     // Spell Penetration
   34003: {type:"mats",mats:[[22446,1],[22445,4],[22451,1]]},     // Greater Agility
+  27962: {type:"mats",mats:[[22446,4],[22445,8]]},               // Major Resistance
+  25086: {type:"mats",mats:[[22448,3],[22446,3]]},               // Dodge
   // Chest
   27960: {type:"mats",mats:[[22449,4],[22446,4],[22445,4]]},     // Exceptional Stats
   33990: {type:"mats",mats:[[22446,2]]},                         // Major Spirit
   46594: {type:"mats",mats:[[22446,4],[22445,8]]},               // Defense
+  27957: {type:"mats",mats:[[22446,6],[22445,10]]},              // Exceptional Health
+  33991: {type:"mats",mats:[[22447,4]]},                         // Restore Mana Prime
   // Wrists
   27917: {type:"mats",mats:[[22449,6],[21884,6],[21885,6]]},     // Spellpower
   34001: {type:"mats",mats:[[22447,3]]},                         // Major Intellect
   27914: {type:"mats",mats:[[22449,1],[22446,10],[22445,20]]},   // Fortitude
   34002: {type:"mats",mats:[[22445,6]]},                         // Assault
+  27899: {type:"mats",mats:[[22445,6]]},                         // Brawn
   // Hands
   33997: {type:"mats",mats:[[22446,6],[22449,6],[22457,6]]},     // Major Spellpower
   33995: {type:"mats",mats:[[22445,12],[22446,1]]},              // Major Strength
@@ -440,20 +479,29 @@ var ENCHANT_COSTS = {
   33996: {type:"mats",mats:[[22445,8]]},                         // Assault (hands)
   33993: {type:"mats",mats:[[22447,1],[22445,4]]},               // Blasting (hands)
   33994: {type:"mats",mats:[[22446,8],[22445,2],[22449,2]]},     // Spell Strike (hands)
+  25072: {type:"mats",mats:[[22448,4],[22446,2]]},               // Threat
+  33999: {type:"mats",mats:[[22449,6],[22446,6],[21885,6]]},     // Major Healing
   // Feet
   34007: {type:"mats",mats:[[22449,8],[22451,8]]},               // Cat's Swiftness
   34008: {type:"mats",mats:[[22449,8],[22452,8]]},               // Boar's Speed
   27951: {type:"mats",mats:[[22446,8],[22445,8]]},               // Dexterity
   27948: {type:"mats",mats:[[22445,6]]},                         // Vitality (+ 4 potions, ~vendor cost)
   27954: {type:"mats",mats:[[22450,2],[22449,4],[23572,1]]},     // Surefooted
+  27950: {type:"mats",mats:[[22445,12]]},                        // Fortitude (boots)
   // Mainhand weapon
   27975: {type:"mats",mats:[[22449,8],[22446,8]]},               // Major Spellpower
+  27981: {type:"mats",mats:[[22450,12],[22449,10],[22446,8]]},   // Sunfire
+  27982: {type:"mats",mats:[[22450,12],[22449,10],[22446,8]]},   // Soulfrost
+  34010: {type:"mats",mats:[[22449,8],[22446,6],[21885,6]]},     // Major Healing
   27984: {type:"mats",mats:[[22450,6],[22449,10],[22446,8],[22445,40]]}, // Mongoose
   46538: {type:"mats",mats:[[22445,8],[22446,4],[22449,6],[22451,2]]},   // Greater Agility (1H)
   27967: {type:"mats",mats:[[22449,2],[22446,6],[22445,6]]},     // Major Striking
   // Twohand weapon
   27971: {type:"mats",mats:[[22449,4],[22445,40]]},              // Savagery (2H)
   27977: {type:"mats",mats:[[22449,8],[22446,6],[22445,20]]},    // Major Agility (2H)
+  27968: {type:"mats",mats:[[22449,6],[22446,4]]},              // Major Intellect (2H)
+  // Wand
+  30260: {type:"item"},                                          // Stabilized Eternium Scope (Engineering BoE)
   // Rings (require 360+ Enchanting)
   27927: {type:"mats",mats:[[22449,2],[22446,2]]},               // Spellpower (ring)
   27926: {type:"mats",mats:[[22449,2],[22446,3],[22445,5]]},     // Healing Power (ring)
