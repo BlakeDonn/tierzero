@@ -1125,12 +1125,7 @@ function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
     if (mode === "mygear") {
       item = getTrackedItem(sk);
     } else {
-      var items = spec.slots[sk];
-      if (items) {
-        for (var j = 0; j < items.length; j++) {
-          if (!isItemFiltered(items[j])) { item = items[j]; break; }
-        }
-      }
+      item = bisItem(sk); // uses getOrderedItems + dedup for ring2/trinket2
     }
 
     // Base item stats

@@ -161,7 +161,8 @@ var ENCHANT_LINK_MAP = {
   2940:34007, // Cat's Swiftness
   2657:34008, // Boar's Speed
   2649:27951, // Dexterity
-  2656:27954, // Vitality
+  2656:27948, // Vitality
+  2658:27954, // Surefooted
   // Weapon
   2669:27975, // Major Spellpower
   2673:27984, // Mongoose
@@ -252,7 +253,7 @@ var ENCHANTS = {
     {id:27977,name:"Major Agility",stats:{agi:35},src:"Enchanting"},
     {id:27984,name:"Mongoose",stats:{},src:"Enchanting",note:"Agi+haste proc"},
     {id:27975,name:"Major Spellpower",stats:{sp:40},src:"Enchanting"},
-    {id:20036,name:"Major Intellect",stats:{int:30},src:"Enchanting"}
+    {id:27968,name:"Major Intellect",stats:{int:30},src:"Enchanting"}
   ],
   offhand:"mainhand",
   wand:[
@@ -321,9 +322,9 @@ var BIS_ENCHANTS = {
   "feral-cat-druid":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27984},
   "feral-bear-druid":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,twohand:27984},
   "fury-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "arms-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27971},
+  "arms-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27984},
   "prot-warrior":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,mainhand:27984},
-  "ret-paladin":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27971},
+  "ret-paladin":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27984},
   "prot-paladin":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:33997,legs:29536,feet:34008,mainhand:27975},
   "holy-paladin":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
   "combat-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
@@ -366,15 +367,14 @@ var BUDGET_ENCHANT_MAP = {
   28909: 28881,  // Greater Insc. of the Oracle → Insc. of Discipline
   28888: 28885,  // Greater Insc. of the Blade → Insc. of Vengeance
   28889: 28882,  // Greater Insc. of the Knight → Insc. of Warding
-  23545: 28885,  // Greater Insc. of Vengeance → Insc. of Vengeance
+  23545: 28907,  // Greater Insc. of Vengeance (Scryer) → Insc. of the Blade (Scryer Honored)
   23547: 28903,  // Greater Insc. of the Orb → Insc. of the Orb
   // Legs: expensive → budget
   31372: 31373,  // Runic Spellthread → Mystic Spellthread
   29535: 29533,  // Nethercobra Leg Armor → Cobrahide Leg Armor
   29536: 29534,  // Nethercleft Leg Armor → Clefthide Leg Armor
   // Feet: handled by price-based system (spec-aware via stat weights)
-  // Weapon: expensive → cheaper
-  27984: 46538,  // Mongoose (proc) → Greater Agility (agi:20)
+  // Weapon: handled by price-based system (slot-aware: 1H→Greater Agi, 2H→Savagery)
   // Rings: skip entirely (require 360 Enchanting)
   27927: null,   // Spellpower → skip
   27926: null,   // Healing Power → skip
