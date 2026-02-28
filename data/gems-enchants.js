@@ -220,14 +220,18 @@ var ENCHANTS = {
     {id:33997,name:"Major Spellpower",stats:{sp:20},src:"Enchanting"},
     {id:33995,name:"Major Strength",stats:{str:15},src:"Enchanting"},
     {id:25080,name:"Superior Agility",stats:{agi:15},src:"Enchanting"},
-    {id:33996,name:"Assault",stats:{ap:26},src:"Enchanting"}
+    {id:33996,name:"Assault",stats:{ap:26},src:"Enchanting"},
+    {id:33993,name:"Blasting",stats:{crit:10},src:"Enchanting"},
+    {id:33994,name:"Spell Strike",stats:{hit:15},src:"Enchanting"}
   ],
   waist:[],
   legs:[
     {id:31372,name:"Runic Spellthread",stats:{sp:35,stam:20},src:"Scryer/Aldor - Exalted"},
     {id:29535,name:"Nethercobra Leg Armor",stats:{ap:50,crit:12},src:"Leatherworking"},
     {id:29536,name:"Nethercleft Leg Armor",stats:{stam:40,agi:12},src:"Leatherworking"},
-    {id:31373,name:"Mystic Spellthread",stats:{sp:25,stam:15},src:"Tailoring"}
+    {id:31373,name:"Mystic Spellthread",stats:{sp:25,stam:15},src:"Tailoring"},
+    {id:29533,name:"Cobrahide Leg Armor",stats:{ap:40,crit:10},src:"Leatherworking"},
+    {id:29534,name:"Clefthide Leg Armor",stats:{stam:30,agi:10},src:"Leatherworking"}
   ],
   feet:[
     {id:34007,name:"Cat's Swiftness",stats:{agi:6},src:"Enchanting",note:"+8% run speed"},
@@ -356,8 +360,10 @@ var BUDGET_ENCHANT_MAP = {
   28889: 28882,  // Greater Insc. of the Knight → Insc. of Warding
   23545: 28885,  // Greater Insc. of Vengeance → Insc. of Vengeance
   23547: 28903,  // Greater Insc. of the Orb → Insc. of the Orb
-  // Legs: Exalted → budget
+  // Legs: expensive → budget
   31372: 31373,  // Runic Spellthread → Mystic Spellthread
+  29535: 29533,  // Nethercobra Leg Armor → Cobrahide Leg Armor
+  29536: 29534,  // Nethercleft Leg Armor → Clefthide Leg Armor
   // Feet: run-speed enchants → raw stat enchants
   34007: 27951,  // Cat's Swiftness (agi:6 + speed) → Dexterity (agi:12)
   34008: 27954,  // Boar's Speed (stam:9 + speed) → Vitality (+4 hp/mp5)
@@ -404,6 +410,8 @@ var ENCHANT_COSTS = {
   31373: {type:"item",itemId:24273}, // Mystic Spellthread
   29535: {type:"item",itemId:29535}, // Nethercobra Leg Armor
   29536: {type:"item",itemId:29536}, // Nethercleft Leg Armor
+  29533: {type:"item",itemId:29533}, // Cobrahide Leg Armor
+  29534: {type:"item",itemId:29534}, // Clefthide Leg Armor
 
   // --- MATS: Enchanting recipes ---
   // Back
@@ -424,6 +432,8 @@ var ENCHANT_COSTS = {
   33995: {type:"mats",mats:[[22445,12],[22446,1]]},              // Major Strength
   25080: {type:"mats",mats:[[22448,3],[22446,3],[22451,2]]},     // Superior Agility
   33996: {type:"mats",mats:[[22445,8]]},                         // Assault (hands)
+  33993: {type:"mats",mats:[[22447,1],[22445,4]]},               // Blasting (hands)
+  33994: {type:"mats",mats:[[22446,8],[22445,2],[22449,2]]},     // Spell Strike (hands)
   // Feet
   34007: {type:"mats",mats:[[22449,8],[22451,8]]},               // Cat's Swiftness
   34008: {type:"mats",mats:[[22449,8],[22452,8]]},               // Boar's Speed

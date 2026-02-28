@@ -220,7 +220,7 @@ local PRICE_IDS = {
     22445, 22446, 22447, 22448, 22449, 22450,  -- Arcane Dust thru Void Crystal
     22451, 22452, 22456, 22457, 21884, 21885,   -- Primals: Air, Earth, Shadow, Mana, Fire, Water
     -- Leg Armors (tradeable items)
-    24274, 24273, 29535, 29536,                  -- Spellthreads + Leg Armors
+    24274, 24273, 29535, 29536, 29533, 29534,    -- Spellthreads + Leg Armors (incl. budget)
     -- Crafting Materials: Primals
     21886, 23571, 23572,                         -- Primal Life, Primal Might, Primal Nether
     -- Crafting Materials: Tailoring Cloth

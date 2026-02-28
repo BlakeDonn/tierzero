@@ -56,6 +56,10 @@ var STAT_WEIGHTS = {
     ap:0.40, agi:0.80, str:0.40, hit:0.00, expertise:0.95,
     crit:0.60, haste:0.50, stam:0.01
   },
+  "subtlety-rogue": {
+    ap:0.40, agi:0.80, str:0.40, hit:0.00, expertise:0.95,
+    crit:0.55, haste:0.45, stam:0.01
+  },
 
   // ======= HUNTER =======
   "bm-hunter": {
@@ -93,7 +97,7 @@ var STAT_WEIGHTS = {
   "holy-priest": {
     heal:1.00, mp5:0.80, spi:0.65, int:0.55, crit:0.45, stam:0.05, haste:0.35
   },
-  "disc-priest": {
+  "discipline-priest": {
     heal:1.00, int:0.65, spi:0.55, mp5:0.75, crit:0.50, stam:0.05, haste:0.35
   },
 

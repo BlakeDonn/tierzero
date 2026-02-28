@@ -199,10 +199,13 @@ function getActiveBisEnchant(specSlug, slotKey) {
     return BUDGET_ENCHANT_MAP[enchId]; // null means skip
   }
 
-  // Price-based: pick cheapest enchant for this slot
+  // Price-based: pick cheapest enchant that has stats relevant to this spec
   var slotEnchants = ENCHANTS[slotKey];
   if (typeof slotEnchants === "string") slotEnchants = ENCHANTS[slotEnchants];
   if (!slotEnchants || !slotEnchants.length) return enchId;
+
+  var weights = hasStatWeights(specSlug) ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return enchId;
 
   var ahPrices = loadAhPrices();
   var bisCost = getEnchantCost(enchId, ahPrices);
@@ -210,6 +213,18 @@ function getActiveBisEnchant(specSlug, slotKey) {
   var cheapestCost = Infinity;
 
   for (var i = 0; i < slotEnchants.length; i++) {
+    // Skip enchants with no meaningful stats for this spec
+    // Requires weight >= 0.10 (filters out stam/spi at 0.01 for DPS)
+    // Cap stats (hit/def) use 0.00 sentinel but are always relevant if tracked
+    var enchStats = slotEnchants[i].stats;
+    var relevant = false;
+    for (var sk in enchStats) {
+      if (!enchStats[sk]) continue;
+      if ((sk === "hit" || sk === "def") && sk in weights) { relevant = true; break; }
+      if (weights[sk] >= 0.10) { relevant = true; break; }
+    }
+    if (!relevant) continue;
+
     var cost = getEnchantCost(slotEnchants[i].id, ahPrices);
     if (cost !== null && cost < cheapestCost) {
       cheapestCost = cost;
