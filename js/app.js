@@ -5,7 +5,7 @@
 let currentSpec = localStorage.getItem("prebis-spec") || "";
 let currentView = "sheet"; // "sheet" | "routes" | "tracker"
 let sheetMode = "bis"; // "bis" | "mygear"
-let rankingSource = localStorage.getItem("prebis-ranking-source") || "tierzero";
+let rankingSource = localStorage.getItem("prebis-ranking-source") || "wowhead";
 var pendingSwaps = null;  // { slotKey: { item, gems[], enchantId, score } } or null
 var optimizerMessage = ""; // transient message shown once then cleared
 

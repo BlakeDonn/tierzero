@@ -682,6 +682,7 @@ const KNOWN_SOURCES = {
 
   // Misc TBC
   31923: 'Quest: Netherstorm', // Band of the Crystalline Void
+  30227: 'Quest: Mark V is Alive!', // Mark V's Throwing Star
 
   // === Classic Naxx drops ===
   // T3 set pieces (all from Naxxramas)

@@ -5989,7 +5989,7 @@ var RANKINGS = {
         }
       ]
     },
-    "sv-hunter": {
+    "survival-hunter": {
       "head": [
         {
           "id": 28275,
@@ -7565,7 +7565,7 @@ var RANKINGS = {
         }
       ]
     },
-    "disc-priest": {
+    "discipline-priest": {
       "head": [
         {
           "id": 32090,
@@ -8093,7 +8093,7 @@ var RANKINGS = {
         }
       ]
     },
-    "ele-shaman": {
+    "elemental-shaman": {
       "head": [
         {
           "id": 32086,
@@ -8433,7 +8433,7 @@ var RANKINGS = {
         }
       ]
     },
-    "enh-shaman": {
+    "enhancement-shaman": {
       "head": [
         {
           "id": 28224,
@@ -9671,7 +9671,7 @@ var RANKINGS = {
         }
       ]
     },
-    "demo-warlock": {
+    "demonology-warlock": {
       "head": [
         {
           "id": 24266,
