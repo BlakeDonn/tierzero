@@ -30,10 +30,13 @@ const INDEX_HTML  = path.join(__dirname, 'data', 'specs.js');
 
 const specSlug = process.argv[2];
 const forceRefetch = process.argv.includes('--force');
+const phaseIdx = process.argv.indexOf('--phase');
+const phase = phaseIdx !== -1 && process.argv[phaseIdx + 1] ? process.argv[phaseIdx + 1] : 'preraid';
 
 if (!specSlug) {
-  console.error('Usage: node _sync-spec.js <spec-slug> [--force]');
+  console.error('Usage: node _sync-spec.js <spec-slug> [--force] [--phase p1]');
   console.error('Example: node _sync-spec.js arcane-mage');
+  console.error('Example: node _sync-spec.js arcane-mage --phase p1');
   process.exit(1);
 }
 
@@ -67,6 +70,38 @@ const GUIDE_URLS = {
   'feral-cat-druid':    'https://www.wowhead.com/tbc/guide/classes/druid/feral-combat/dps-bis-gear-pve-pre-raid',
   'feral-bear-druid':   'https://www.wowhead.com/tbc/guide/classes/druid/feral-combat/tank-bis-gear-pve-pre-raid',
   'resto-druid':        'https://www.wowhead.com/tbc/guide/classes/druid/restoration/healer-bis-gear-pve-pre-raid',
+};
+
+// Phase 1 (Karazhan/Gruul/Mag) guide URLs
+const P1_GUIDE_URLS = {
+  'arcane-mage':  'https://www.wowhead.com/tbc/guide/arcane-mage-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'fire-mage':    'https://www.wowhead.com/tbc/guide/fire-mage-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'frost-mage':   'https://www.wowhead.com/tbc/guide/frost-mage-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'holy-paladin': 'https://www.wowhead.com/tbc/guide/holy-paladin-healer-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'prot-paladin': 'https://www.wowhead.com/tbc/guide/paladin-tank-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'ret-paladin':  'https://www.wowhead.com/tbc/guide/retribution-paladin-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'fury-warrior': 'https://www.wowhead.com/tbc/guide/warrior-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'arms-warrior': 'https://www.wowhead.com/tbc/guide/warrior-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'prot-warrior': 'https://www.wowhead.com/tbc/guide/protection-warrior-tank-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'bm-hunter':    'https://www.wowhead.com/tbc/guide/beast-mastery-hunter-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'mm-hunter':    'https://www.wowhead.com/tbc/guide/marksmanship-hunter-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'survival-hunter':    'https://www.wowhead.com/tbc/guide/survival-hunter-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'combat-rogue':       'https://www.wowhead.com/tbc/guide/rogue-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'assassination-rogue':'https://www.wowhead.com/tbc/guide/rogue-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'subtlety-rogue':     'https://www.wowhead.com/tbc/guide/rogue-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'shadow-priest':      'https://www.wowhead.com/tbc/guide/shadow-priest-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'holy-priest':        'https://www.wowhead.com/tbc/guide/priest-healer-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'discipline-priest':  'https://www.wowhead.com/tbc/guide/priest-healer-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'elemental-shaman':   'https://www.wowhead.com/tbc/guide/elemental-shaman-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'enhancement-shaman': 'https://www.wowhead.com/tbc/guide/enhancement-shaman-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'resto-shaman':       'https://www.wowhead.com/tbc/guide/shaman-healer-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'affliction-warlock':  'https://www.wowhead.com/tbc/guide/affliction-warlock-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'destruction-warlock': 'https://www.wowhead.com/tbc/guide/destruction-warlock-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'demonology-warlock':  'https://www.wowhead.com/tbc/guide/demonology-warlock-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'balance-druid':      'https://www.wowhead.com/tbc/guide/balance-druid-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'feral-cat-druid':    'https://www.wowhead.com/tbc/guide/feral-druid-dps-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'feral-bear-druid':   'https://www.wowhead.com/tbc/guide/feral-druid-tank-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
+  'resto-druid':        'https://www.wowhead.com/tbc/guide/druid-healer-karazhan-best-in-slot-gear-burning-crusade-classic-wow',
 };
 
 // Known non-gear item IDs to skip
@@ -230,24 +265,31 @@ async function fetchGuidePage(url) {
 }
 
 function extractGuideItemIds(guideHtml) {
-  const ids = new Set();
+  const seen = new Set();
+  const ordered = [];
 
   // Pattern 1: /tbc/item=XXXXX or /tbc/item/XXXXX
   const re1 = /\/tbc\/item[=\/](\d+)/g;
   let m;
   while ((m = re1.exec(guideHtml))) {
     const id = parseInt(m[1]);
-    if (id >= 1000 && !SKIP_IDS.has(id)) ids.add(id);
+    if (id >= 1000 && !SKIP_IDS.has(id) && !seen.has(id)) {
+      seen.add(id);
+      ordered.push(id);
+    }
   }
 
   // Pattern 2: [item=XXXXX] wowhead markup
   const re2 = /\[item=(\d+)\]/g;
   while ((m = re2.exec(guideHtml))) {
     const id = parseInt(m[1]);
-    if (id >= 1000 && !SKIP_IDS.has(id)) ids.add(id);
+    if (id >= 1000 && !SKIP_IDS.has(id) && !seen.has(id)) {
+      seen.add(id);
+      ordered.push(id);
+    }
   }
 
-  return [...ids];
+  return ordered;
 }
 
 // ============================================================
@@ -863,14 +905,15 @@ function formatItem(item) {
 // ============================================================
 
 async function main() {
-  const guideUrl = GUIDE_URLS[specSlug];
+  const urlMap = phase === 'p1' ? P1_GUIDE_URLS : GUIDE_URLS;
+  const guideUrl = urlMap[specSlug];
   if (!guideUrl) {
-    console.error(`Unknown spec slug: "${specSlug}"`);
-    console.error('Available:', Object.keys(GUIDE_URLS).join(', '));
+    console.error(`Unknown spec slug: "${specSlug}" for phase "${phase}"`);
+    console.error('Available:', Object.keys(urlMap).join(', '));
     process.exit(1);
   }
 
-  console.log(`=== Sync Spec: ${specSlug} ===\n`);
+  console.log(`=== Sync Spec: ${specSlug} (${phase === 'p1' ? 'Phase 1' : 'Pre-Raid'}) ===\n`);
 
   // 1. Load source DB and cache
   console.log('Loading source DB...');
@@ -883,11 +926,18 @@ async function main() {
   console.log('Loading existing SPECS data...');
   let existingItems = {};
   let globalSources = {};
-  if (fs.existsSync(INDEX_HTML)) {
+  if (phase === 'preraid' && fs.existsSync(INDEX_HTML)) {
     const html = fs.readFileSync(INDEX_HTML, 'utf8');
     existingItems = extractExistingItems(html, specSlug);
     globalSources = extractAllItemSources(html);
     console.log(`  ${Object.keys(existingItems).length} existing items for ${specSlug}, ${Object.keys(globalSources).length} global sources`);
+  } else if (phase !== 'preraid') {
+    // For P1+, still load global sources for source resolution but don't merge existing items
+    if (fs.existsSync(INDEX_HTML)) {
+      const html = fs.readFileSync(INDEX_HTML, 'utf8');
+      globalSources = extractAllItemSources(html);
+      console.log(`  ${Object.keys(globalSources).length} global sources (no existing item merge for ${phase})`);
+    }
   }
 
   // 3. Fetch Wowhead guide
@@ -899,14 +949,21 @@ async function main() {
   }
 
   const guideItemIds = extractGuideItemIds(guideHtml);
+  // Build guide order map: itemId → position (for P1 sorting by Wowhead's BiS rank)
+  const guideOrder = {};
+  for (let gi = 0; gi < guideItemIds.length; gi++) {
+    guideOrder[guideItemIds[gi]] = gi;
+  }
   console.log(`  Found ${guideItemIds.length} item IDs on guide page`);
 
-  // Also include existing item IDs not on guide (preserve our additions)
+  // Also include existing item IDs not on guide (preserve our additions — preraid only)
   const allIds = new Set(guideItemIds);
-  for (const id of Object.keys(existingItems)) {
-    allIds.add(parseInt(id));
+  if (phase === 'preraid') {
+    for (const id of Object.keys(existingItems)) {
+      allIds.add(parseInt(id));
+    }
   }
-  console.log(`  Total unique IDs (guide + existing): ${allIds.size}`);
+  console.log(`  Total unique IDs: ${allIds.size}`);
 
   // 4. Fetch all tooltips
   console.log('\nFetching tooltips...');
@@ -981,14 +1038,24 @@ async function main() {
     }
   }
 
-  // 6. Sort items within each slot: epic > rare > uncommon, then by name
+  // 6. Sort items within each slot
   for (const slot of Object.keys(slotItems)) {
-    slotItems[slot].sort((a, b) => {
-      const qa = QUALITY_SORT[a.quality] ?? 5;
-      const qb = QUALITY_SORT[b.quality] ?? 5;
-      if (qa !== qb) return qa - qb;
-      return a.name.localeCompare(b.name);
-    });
+    if (phase !== 'preraid') {
+      // P1+: preserve Wowhead guide order (BiS rank), unranked items last
+      slotItems[slot].sort((a, b) => {
+        const oa = guideOrder[a.id] ?? 99999;
+        const ob = guideOrder[b.id] ?? 99999;
+        return oa - ob;
+      });
+    } else {
+      // Pre-raid: epic > rare > uncommon, then by name
+      slotItems[slot].sort((a, b) => {
+        const qa = QUALITY_SORT[a.quality] ?? 5;
+        const qb = QUALITY_SORT[b.quality] ?? 5;
+        if (qa !== qb) return qa - qb;
+        return a.name.localeCompare(b.name);
+      });
+    }
 
     // Deduplicate by ID within each slot
     const seen = new Set();
@@ -1003,18 +1070,23 @@ async function main() {
   console.log('\nGenerating output...');
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const outputPath = path.join(OUTPUT_DIR, `${specSlug}.js`);
+  const outputSuffix = phase === 'p1' ? `-p1` : '';
+  const outputPath = path.join(OUTPUT_DIR, `${specSlug}${outputSuffix}.js`);
   const now = new Date().toISOString().split('T')[0];
   let totalItems = 0;
   const slotCounts = {};
 
   const lines = [];
   lines.push(`// Generated by _sync-spec.js — do not edit manually`);
-  lines.push(`// Source: Wowhead guide + AtlasLoot + tooltip API`);
+  lines.push(`// Source: Wowhead ${phase === 'p1' ? 'Phase 1' : 'pre-raid'} guide + AtlasLoot + tooltip API`);
   lines.push(`// Date: ${now}`);
 
   lines.push('');
-  lines.push('slots:{');
+  if (phase === 'p1') {
+    lines.push(`SPECS["${specSlug}"].p1 = {`);
+  } else {
+    lines.push('slots:{');
+  }
 
   for (const slot of SLOT_ORDER) {
     const items = slotItems[slot];
@@ -1030,7 +1102,11 @@ async function main() {
     lines.push('  ],');
   }
 
-  lines.push('}');
+  if (phase === 'p1') {
+    lines.push('};');
+  } else {
+    lines.push('}');
+  }
 
   // Update header with total count
   lines[3] = `// Items: ${totalItems} across ${Object.keys(slotCounts).length} slots`;

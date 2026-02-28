@@ -8,6 +8,7 @@ let sheetMode = "bis"; // "bis" | "mygear"
 let rankingSource = localStorage.getItem("prebis-ranking-source") || "wowhead";
 var pendingSwaps = null;  // { slotKey: { item, gems[], enchantId, score } } or null
 var optimizerMessage = ""; // transient message shown once then cleared
+var activePhase = localStorage.getItem("prebis-phase") || "preraid";
 
 // ---------------------------------------------------------------------------
 // Budget Mode
@@ -444,11 +445,12 @@ function closeFilterModal() {
 function isItemOwnedInTracker(slotKey, itemId) {
   var tracked = loadTracker();
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   if (tracked[slotKey] === undefined || tracked[slotKey] === "") return false;
   var val = String(tracked[slotKey]);
   if (val.indexOf("c:") === 0) return false; // custom items don't match BiS items
   var idx = parseInt(val, 10);
-  var items = spec.slots[slotKey];
+  var items = slots[slotKey];
   if (!items || !items[idx]) return false;
   return items[idx].id === itemId;
 }
@@ -612,6 +614,7 @@ function fetchCustomItemStats(itemId, callback) {
 function getTrackedItem(slotKey) {
   var tracked = loadTracker();
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var val = tracked[slotKey];
   if (val === undefined || val === "") return null;
   var str = String(val);
@@ -633,7 +636,7 @@ function getTrackedItem(slotKey) {
     };
   }
   var idx = parseInt(str, 10);
-  var items = spec.slots[slotKey];
+  var items = slots[slotKey];
   if (!items || !items[idx]) return null;
   var item = items[idx];
   return {name: item.name, id: item.id, src: item.src, q: item.q, stats: item.stats, sockets: item.sockets, socketBonus: item.socketBonus, isCustom: false};
@@ -644,6 +647,7 @@ function getTrackedItem(slotKey) {
 // ---------------------------------------------------------------------------
 function sourceTag(src) {
   const s = src.toLowerCase();
+  if (s.includes("karazhan") || s.includes("gruul") || s.includes("magtheridon") || s.includes("high king")) return '<span class="tag tag-raid">Raid</span>';
   if (s.includes("heroic"))                                                           return '<span class="tag tag-heroic">Heroic</span>';
   if (s.includes("badge") || s.includes("g'eras"))                                    return '<span class="tag tag-badge">Badges</span>';
   if (s.includes("honor") || s.includes("pvp") || s.includes("arena") || s.includes("gladiator")) return '<span class="tag tag-pvp">PvP</span>';
@@ -826,6 +830,18 @@ function showMainUI() {
   var specIconImg = specIconFile ? '<img class="spec-icon-inline" src="' + WOW_ICON + specIconFile + '.jpg"> ' : '';
   hSpec.innerHTML = '<span class="spec-name" style="color:' + classColor + '">' + specIconImg + spec.spec + ' ' + spec.class + '</span>' +
     '<button class="change-spec-btn" onclick="showSpecPicker()">Change Spec</button>';
+  // Phase toggle below header
+  var pt = document.getElementById("phaseToggleHeader");
+  if (pt) {
+    if (hasPhaseData("p1")) {
+      pt.style.display = "";
+      pt.innerHTML = '<button class="header-phase-btn' + (activePhase === "preraid" ? " active" : "") + '" onclick="setPhase(\'preraid\')">Pre-Raid</button>' +
+        '<button class="header-phase-btn' + (activePhase === "p1" ? " active" : "") + '" onclick="setPhase(\'p1\')">P1</button>';
+    } else {
+      pt.style.display = "none";
+      pt.innerHTML = '';
+    }
+  }
   document.getElementById("viewTabs").style.display = "";
   // Re-activate current view
   document.getElementById("sheetView").classList.toggle("active", currentView === "sheet");
@@ -869,7 +885,30 @@ function specData() {
 }
 
 function specSlots() {
-  return specData().slots;
+  var spec = specData();
+  if (!spec) return {};
+  if (activePhase === "p1" && spec.p1) return spec.p1;
+  return spec.slots;
+}
+
+function getPhaseSlots(spec) {
+  if (activePhase === "p1" && spec.p1) return spec.p1;
+  return spec.slots;
+}
+
+function hasPhaseData(phase) {
+  var spec = specData();
+  if (!spec) return false;
+  if (phase === "p1") return !!spec.p1;
+  return true;
+}
+
+function setPhase(phase) {
+  activePhase = phase;
+  localStorage.setItem("prebis-phase", phase);
+  pendingSwaps = null;
+  renderCurrentView();
+  showMainUI();
 }
 
 function bisItem(slotKey) {
@@ -909,6 +948,7 @@ function getOrderedItems(slotKey) {
   var items = specSlots()[slotKey];
   if (!items || !items.length) return items;
   if (rankingSource === "tierzero") return items;
+  if (activePhase !== "preraid") return items; // rankings are phase-specific
   if (!hasRankingData(currentSpec, rankingSource)) return items;
 
   var rankData = RANKINGS[rankingSource][currentSpec][slotKey];
@@ -936,7 +976,7 @@ function getOrderedItems(slotKey) {
 }
 
 function getRankLabel(slotKey, itemId) {
-  if (rankingSource === "tierzero" || !hasRankingData(currentSpec, rankingSource)) return null;
+  if (rankingSource === "tierzero" || activePhase !== "preraid" || !hasRankingData(currentSpec, rankingSource)) return null;
   var rankData = RANKINGS[rankingSource][currentSpec][slotKey];
   if (!rankData) return null;
   for (var i = 0; i < rankData.length; i++) {
@@ -1117,10 +1157,11 @@ function capAwareDelta(item, refItem, specSlug, otherCapTotal, capKey, capVal, s
 function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
   var spec = SPECS[specSlug];
   if (!spec) return 0;
+  var slots = getPhaseSlots(spec);
   var total = 0;
-  var slotKeys = Object.keys(spec.slots);
-  var hasMainhand = !!spec.slots["mainhand"];
-  var hasTwohand = !!spec.slots["twohand"];
+  var slotKeys = Object.keys(slots);
+  var hasMainhand = !!slots["mainhand"];
+  var hasTwohand = !!slots["twohand"];
 
   // Load tracker data once for mygear mode
   var trackedGems = (mode === "mygear") ? loadTrackerGems() : null;
@@ -1242,11 +1283,12 @@ function scoreBreakdownTooltip(item, refItem, specSlug, otherCapTotal, capKey, c
 
 function computeBisScore() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var specSlug = localStorage.getItem("prebis-spec");
   if (!hasStatWeights(specSlug)) return 0;
-  var slotKeys = Object.keys(spec.slots);
-  var hasMainhand = !!spec.slots["mainhand"];
-  var hasTwohand = !!spec.slots["twohand"];
+  var slotKeys = Object.keys(slots);
+  var hasMainhand = !!slots["mainhand"];
+  var hasTwohand = !!slots["twohand"];
   var total = 0;
   for (var i = 0; i < slotKeys.length; i++) {
     var sk = slotKeys[i];
@@ -1259,9 +1301,10 @@ function computeBisScore() {
 
 function computeTrackerScore() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var specSlug = localStorage.getItem("prebis-spec");
   if (!hasStatWeights(specSlug)) return 0;
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   var tracked = loadTracker();
   var hasTrackedMainhand = tracked["mainhand"] !== undefined && tracked["mainhand"] !== "";
   var hasTrackedTwohand = tracked["twohand"] !== undefined && tracked["twohand"] !== "";
@@ -1476,7 +1519,7 @@ function renderGearSlot(slotKey) {
   var label = SLOT_LABELS[slotKey] || slotKey;
   var qc = qualityClass(top.q);
   var count = items.length;
-  var useRankLabels = rankingSource !== "tierzero" && hasRankingData(currentSpec, rankingSource);
+  var useRankLabels = rankingSource !== "tierzero" && activePhase === "preraid" && hasRankingData(currentSpec, rankingSource);
 
   var html = '<div class="gear-slot quality-' + qc + '" onclick="toggleSlot(this)">';
   html += '<div class="slot-header">';
@@ -1573,12 +1616,13 @@ function findEnchantById(slot, enchId) {
 
 function computeBisStats() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var stats = {};
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   var specSlug = localStorage.getItem("prebis-spec");
   // Avoid double-counting weapons: prefer mainhand+offhand over twohand
-  var hasMainhand = !!spec.slots["mainhand"];
-  var hasTwohand = !!spec.slots["twohand"];
+  var hasMainhand = !!slots["mainhand"];
+  var hasTwohand = !!slots["twohand"];
   var bisGems = getActiveBisGems(specSlug);
   for (var i = 0; i < slotKeys.length; i++) {
     var sk = slotKeys[i];
@@ -2127,7 +2171,8 @@ function renderMyGearSlot(slotKey) {
 
 function renderSheet() {
   var spec = specData();
-  var bis = spec.slots;
+  var slots = getPhaseSlots(spec);
+  var bis = slots;
   var classColorMap = {"Mage":"var(--mage-color)","Paladin":"var(--paladin-color)","Warrior":"var(--warrior-color)","Rogue":"var(--rogue-color)","Hunter":"var(--hunter-color)","Warlock":"var(--warlock-color)","Priest":"var(--priest-color)","Shaman":"var(--shaman-color)","Druid":"var(--druid-color)"};
   var classColor = classColorMap[spec.class] || spec.classColor;
   var specIconFile = (SPEC_ICONS[spec.class] || {})[spec.spec] || '';
@@ -2310,6 +2355,7 @@ function parseDungeonGroup(src) {
 
 function sourceTypeKey(src) {
   var s = src.toLowerCase();
+  if (s.includes("karazhan") || s.includes("gruul") || s.includes("magtheridon") || s.includes("high king")) return "raid";
   if (s.includes("heroic")) return "heroic";
   if (s.includes("badge") || s.includes("g'eras")) return "badge";
   if (s.includes("honor") || s.includes("pvp") || s.includes("arena")) return "pvp";
@@ -2324,6 +2370,7 @@ function sourceTypeKey(src) {
 
 function sourceEmoji(type) {
   switch(type) {
+    case "raid": return "\uD83D\uDC32";
     case "heroic": return "\u2694\uFE0F";
     case "badge": return "\uD83E\uDE99";
     case "craft": return "\uD83D\uDD28";
@@ -2338,6 +2385,7 @@ function sourceEmoji(type) {
 
 // Source category definitions
 var SOURCE_CATEGORIES = [
+  {key:'raid',    label:'Raids', icon:'\uD83D\uDC32'},
   {key:'dungeon', label:'Dungeons', icon:'\uD83D\uDDE1\uFE0F'},
   {key:'heroic',  label:'Heroic Dungeons', icon:'\u2694\uFE0F'},
   {key:'craft',   label:'Crafting', icon:'\uD83D\uDD28'},
@@ -2349,10 +2397,11 @@ var OTHER_KEYS = ['badge','classic','quest','world','pvp'];
 
 // Find the first matching item from spec data for a priority text string
 function findPrioItemId(prioText, spec) {
-  var slotKeys = Object.keys(spec.slots);
+  var slots = getPhaseSlots(spec);
+  var slotKeys = Object.keys(slots);
   // Exact name match first
   for (var i = 0; i < slotKeys.length; i++) {
-    var items = spec.slots[slotKeys[i]];
+    var items = slots[slotKeys[i]];
     for (var j = 0; j < items.length; j++) {
       if (prioText.includes(items[j].name)) return items[j].id;
     }
@@ -2361,7 +2410,7 @@ function findPrioItemId(prioText, spec) {
   // where the set name appears (e.g. "Spellfire Set")
   var prioLower = prioText.toLowerCase();
   for (var i = 0; i < slotKeys.length; i++) {
-    var items = spec.slots[slotKeys[i]];
+    var items = slots[slotKeys[i]];
     for (var j = 0; j < items.length; j++) {
       var words = items[j].name.split(" ");
       if (words.length >= 2 && prioLower.includes(words[0].toLowerCase()) && items[j].q >= 3) {
@@ -2463,6 +2512,7 @@ function filterRouteSources() {
 
 function renderRoutes() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var tracked = loadTracker();
   var html = '<div class="routes-container">';
 
@@ -2476,7 +2526,7 @@ function renderRoutes() {
     var prioItems = [];
     for (var i = 0; i < prio.length; i++) {
       var owned = false;
-      var slotKeys = Object.keys(spec.slots);
+      var slotKeys = Object.keys(slots);
       for (var sk = 0; sk < slotKeys.length; sk++) {
         var tval = tracked[slotKeys[sk]];
         if (tval === undefined || tval === "") continue;
@@ -2486,7 +2536,7 @@ function renderRoutes() {
           if (custom && prio[i].includes(custom.name)) { owned = true; break; }
         } else {
           var idx = parseInt(tStr, 10);
-          var items = spec.slots[slotKeys[sk]];
+          var items = slots[slotKeys[sk]];
           if (items && items[idx] && prio[i].includes(items[idx].name)) { owned = true; break; }
         }
       }
@@ -2567,9 +2617,9 @@ function renderRoutes() {
 
   // Build groups
   _routeGroups = {};
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   for (var i = 0; i < slotKeys.length; i++) {
-    var items = spec.slots[slotKeys[i]];
+    var items = slots[slotKeys[i]];
     for (var j = 0; j < items.length; j++) {
       var item = items[j];
       if (isItemFiltered(item)) continue;
@@ -2667,7 +2717,8 @@ function renderRoutes() {
 // Gear Tracker View
 // ---------------------------------------------------------------------------
 function trackerKey() {
-  return "prebis-tracker-" + currentSpec;
+  if (activePhase === "preraid") return "prebis-tracker-" + currentSpec;
+  return "prebis-tracker-" + activePhase + "-" + currentSpec;
 }
 
 function loadTracker() {
@@ -2707,10 +2758,12 @@ function resetTracker() {
 }
 
 function trackerEnchantsKey() {
-  return "prebis-tracker-enchants-" + currentSpec;
+  if (activePhase === "preraid") return "prebis-tracker-enchants-" + currentSpec;
+  return "prebis-tracker-enchants-" + activePhase + "-" + currentSpec;
 }
 function trackerGemsKey() {
-  return "prebis-tracker-gems-" + currentSpec;
+  if (activePhase === "preraid") return "prebis-tracker-gems-" + currentSpec;
+  return "prebis-tracker-gems-" + activePhase + "-" + currentSpec;
 }
 function loadTrackerEnchants() {
   try { var r = localStorage.getItem(trackerEnchantsKey()); return r ? JSON.parse(r) : {}; } catch(e) { return {}; }
@@ -2748,6 +2801,7 @@ function setTrackerGem(slot, socketIdx, gemId) {
 
 function getTrackerStats() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var tracked = loadTracker();
   var trackedEnchants = loadTrackerEnchants();
   var trackedGems = loadTrackerGems();
@@ -2756,7 +2810,7 @@ function getTrackerStats() {
   // Determine which weapon setup is active to avoid double-counting
   var hasTrackedMainhand = tracked["mainhand"] !== undefined && tracked["mainhand"] !== "";
   var hasTrackedTwohand = tracked["twohand"] !== undefined && tracked["twohand"] !== "";
-  var allSlots = Object.keys(spec.slots);
+  var allSlots = Object.keys(slots);
   for (var i = 0; i < allSlots.length; i++) {
     var slot = allSlots[i];
     // Skip twohand if mainhand is tracked (prefer MH+OH)
@@ -2895,7 +2949,8 @@ function renderTypeaheadOptions(slot, query, whResults) {
   var dd = document.getElementById('ta-dd-' + slot);
   if (!dd) return;
   var spec = specData();
-  var items = spec.slots[slot] || [];
+  var slots = getPhaseSlots(spec);
+  var items = slots[slot] || [];
   var html = '';
   var bisIds = {};
 
@@ -3058,8 +3113,9 @@ function clearTypeahead(slot) {
 
 function renderTracker() {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var tracked = loadTracker();
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   var totalSlots = slotKeys.length;
   var filledSlots = 0;
 
@@ -3103,7 +3159,7 @@ function renderTracker() {
   html += '<div class="tracker-slots">';
   for (var i = 0; i < slotKeys.length; i++) {
     var slot = slotKeys[i];
-    var items = spec.slots[slot];
+    var items = slots[slot];
     var label = SLOT_LABELS[slot] || slot;
     var trackedItem = getTrackedItem(slot);
     var isOwned = !!trackedItem;
@@ -3303,6 +3359,7 @@ function matchEnchantByTooltip(tooltipText, slot) {
 function importEquippedGear(parsed) {
   if (!parsed || !parsed.equipped) return { total: 0, bis: 0, custom: 0 };
   var spec = specData();
+  var phaseSlots = getPhaseSlots(spec);
   var bisCount = 0, customCount = 0, total = 0;
   var importedEnchants = {};
   var importedGems = {};
@@ -3313,7 +3370,7 @@ function importEquippedGear(parsed) {
   var slots = Object.keys(parsed.equipped);
   for (var i = 0; i < slots.length; i++) {
     var slot = slots[i];
-    if (!spec.slots[slot]) {
+    if (!phaseSlots[slot]) {
       console.warn('[TZ Import] Slot "' + slot + '" not in spec — skipped');
       continue;
     }
@@ -3322,7 +3379,7 @@ function importEquippedGear(parsed) {
 
     // Check if this item matches any BiS item in this slot
     var bisIdx = -1;
-    var slotItems = spec.slots[slot];
+    var slotItems = phaseSlots[slot];
     for (var j = 0; j < slotItems.length; j++) {
       if (slotItems[j].id === importedItem.id) {
         bisIdx = j;
@@ -3407,7 +3464,7 @@ function importEquippedGear(parsed) {
   var existingGems = loadTrackerGems();
   for (var si = 0; si < slots.length; si++) {
     var sl = slots[si];
-    if (!spec.slots[sl]) continue;
+    if (!phaseSlots[sl]) continue;
     // Clear old enchant/gem for this slot (import is authoritative)
     delete existingEnch[sl];
     delete existingGems[sl];
@@ -3427,6 +3484,7 @@ function importEquippedGear(parsed) {
 function findBagSuggestions(parsed) {
   if (!parsed) return [];
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var tracked = loadTracker();
   var suggestions = [];
   var allItems = (parsed.bags || []).concat(parsed.bank || []);
@@ -3436,10 +3494,10 @@ function findBagSuggestions(parsed) {
     var source = i < parsed.bags.length ? 'bag' : 'bank';
 
     // Check every slot for a BiS match
-    var slotKeys = Object.keys(spec.slots);
+    var slotKeys = Object.keys(slots);
     for (var s = 0; s < slotKeys.length; s++) {
       var slot = slotKeys[s];
-      var slotItems = spec.slots[slot];
+      var slotItems = slots[slot];
 
       for (var j = 0; j < slotItems.length; j++) {
         if (slotItems[j].id === bagItem.id) {
@@ -3614,7 +3672,8 @@ var lastOptimizerResult = null;
 
 // Step 1: Find all SPECS items the player owns for a given slot
 function findInventoryMatches(slotKey, spec, allInv, tracked) {
-  var slotItems = spec.slots[slotKey];
+  var slots = getPhaseSlots(spec);
+  var slotItems = slots[slotKey];
   if (!slotItems) return [];
   var matches = [];
   for (var i = 0; i < slotItems.length; i++) {
@@ -3925,6 +3984,7 @@ function buildCandidate(items, gemVariant, enchantStats, specSlug, capKey) {
 }
 
 function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
+  var slots = getPhaseSlots(spec);
   var capKey = spec.hitCap ? "hit" : (spec.defCap ? "def" : null);
   var groups = [];
   var singleSlots = ["head","neck","shoulders","back","chest","wrists","hands","waist","legs","feet"];
@@ -3932,7 +3992,7 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
   // Single slots
   for (var s = 0; s < singleSlots.length; s++) {
     var sk = singleSlots[s];
-    if (!spec.slots[sk]) continue;
+    if (!slots[sk]) continue;
     var matches = findInventoryMatches(sk, spec, allInv, tracked);
     var candidates = [];
     for (var m = 0; m < matches.length; m++) {
@@ -3955,7 +4015,7 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
 
   // Paired slots: rings
   var ringSlots = ["ring1","ring2"];
-  if (spec.slots.ring1) {
+  if (slots.ring1) {
     // Pool all owned rings from ring1 + ring2
     var ringPool = [];
     var ringSeen = {};
@@ -4005,7 +4065,7 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
 
   // Paired slots: trinkets
   var trinketSlots = ["trinket1","trinket2"];
-  if (spec.slots.trinket1) {
+  if (slots.trinket1) {
     var trinketPool = [];
     var trinketSeen = {};
     for (var t = 0; t < trinketSlots.length; t++) {
@@ -4043,9 +4103,9 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
   }
 
   // Weapon super-group: MH+OH pairs + 2H options
-  var hasMH = !!spec.slots.mainhand;
-  var has2H = !!spec.slots.twohand;
-  var hasOH = !!spec.slots.offhand;
+  var hasMH = !!slots.mainhand;
+  var has2H = !!slots.twohand;
+  var hasOH = !!slots.offhand;
   if (hasMH || has2H) {
     var weaponCandidates = [];
     var enchMH = getEnchantStats(specSlug, "mainhand");
@@ -4101,7 +4161,7 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
   }
 
   // Wand (single)
-  if (spec.slots.wand) {
+  if (slots.wand) {
     var wandMatches = findInventoryMatches("wand", spec, allInv, tracked);
     var wandCandidates = [];
     for (var w = 0; w < wandMatches.length; w++) {
@@ -4118,7 +4178,7 @@ function buildEquipmentGroups(spec, allInv, tracked, specSlug) {
   }
 
   // Libram / Relic (single)
-  if (spec.slots.libram) {
+  if (slots.libram) {
     var libMatches = findInventoryMatches("libram", spec, allInv, tracked);
     var libCandidates = [];
     for (var l = 0; l < libMatches.length; l++) {
@@ -4261,7 +4321,8 @@ function greedyBestPerSlot(specSlug, spec, allInv, tracked) {
     slots: {}
   };
 
-  var allSlots = Object.keys(spec.slots);
+  var slots = getPhaseSlots(spec);
+  var allSlots = Object.keys(slots);
   var bisGems = getActiveBisGems(specSlug);
 
   // Track used item IDs for ring/trinket uniqueness
@@ -4270,8 +4331,8 @@ function greedyBestPerSlot(specSlug, spec, allInv, tracked) {
   for (var i = 0; i < allSlots.length; i++) {
     var sk = allSlots[i];
     // Skip weapon conflicts
-    if (sk === "twohand" && spec.slots.mainhand) continue;
-    if ((sk === "mainhand" || sk === "offhand") && spec.slots.twohand && !spec.slots.mainhand) continue;
+    if (sk === "twohand" && slots.mainhand) continue;
+    if ((sk === "mainhand" || sk === "offhand") && slots.twohand && !slots.mainhand) continue;
 
     var matches = findInventoryMatches(sk, spec, allInv, tracked);
     var bestScore = -1;
@@ -4419,9 +4480,10 @@ function acceptSwap(slotKey) {
   if (!pendingSwaps || !pendingSwaps[slotKey]) return;
   var swap = pendingSwaps[slotKey];
   var spec = specData();
+  var slots = getPhaseSlots(spec);
 
   // Find index in SPECS
-  var items = spec.slots[slotKey];
+  var items = slots[slotKey];
   var idx = -1;
   if (items) {
     for (var j = 0; j < items.length; j++) {
@@ -4467,6 +4529,7 @@ function rejectSwap(slotKey) {
 function applyAllSwaps() {
   if (!pendingSwaps) return;
   var spec = specData();
+  var phaseSlots = getPhaseSlots(spec);
   var tracker = loadTracker();
   var gemData = loadTrackerGems();
   var enchData = loadTrackerEnchants();
@@ -4477,7 +4540,7 @@ function applyAllSwaps() {
     var swap = pendingSwaps[sk];
     if (!swap || !swap.item) continue;
 
-    var items = spec.slots[sk];
+    var items = phaseSlots[sk];
     var idx = -1;
     if (items) {
       for (var j = 0; j < items.length; j++) {
@@ -4515,7 +4578,8 @@ function dismissAllSwaps() {
 
 function findBestInventoryItem(slotKey, inventory) {
   var spec = specData();
-  var slotItems = spec.slots[slotKey];
+  var slots = getPhaseSlots(spec);
+  var slotItems = slots[slotKey];
   if (!slotItems) return null;
   var allInv = (inventory.bags || []).concat(inventory.bank || []);
 
@@ -4542,10 +4606,11 @@ function findBestInventoryItem(slotKey, inventory) {
 
 function computeRaidStats(recommendations) {
   var spec = specData();
+  var slots = getPhaseSlots(spec);
   var stats = {};
   var specSlug = localStorage.getItem("prebis-spec");
-  var hasMainhand = !!spec.slots["mainhand"];
-  var hasTwohand = !!spec.slots["twohand"];
+  var hasMainhand = !!slots["mainhand"];
+  var hasTwohand = !!slots["twohand"];
 
   var slotKeys = Object.keys(recommendations);
   for (var i = 0; i < slotKeys.length; i++) {
@@ -4565,6 +4630,7 @@ function renderRaidSetup() {
   if (!container) return;
   var spec = specData();
   if (!spec) { container.innerHTML = ''; return; }
+  var slots = getPhaseSlots(spec);
 
   var inventory = loadInventory();
 
@@ -4581,7 +4647,7 @@ function renderRaidSetup() {
     return;
   }
 
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   var recommendations = {};
   var filledCount = 0;
 
@@ -4675,7 +4741,7 @@ function renderRaidSetup() {
     var sk = slotKeys[i];
     var rec = recommendations[sk];
     var label = SLOT_LABELS[sk] || sk;
-    var slotItems = spec.slots[sk];
+    var slotItems = slots[sk];
     var bisTop = slotItems && slotItems[0] ? slotItems[0] : null;
 
     html += '<div class="raid-slot-card">';
@@ -4724,10 +4790,11 @@ function renderRaidSetup() {
 function applyRaidRecommendations() {
   var spec = specData();
   if (!spec) return;
+  var slots = getPhaseSlots(spec);
   var inventory = loadInventory();
   if (!inventory) return;
 
-  var slotKeys = Object.keys(spec.slots);
+  var slotKeys = Object.keys(slots);
   var count = 0;
   for (var i = 0; i < slotKeys.length; i++) {
     var sk = slotKeys[i];

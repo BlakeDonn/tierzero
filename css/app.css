@@ -318,6 +318,7 @@
     .tag-quest { background:rgba(255,255,0,0.1); color:#cccc44; }
     .tag-world { background:rgba(163,53,238,0.1); color:#9966cc; }
     .tag-classic { background:rgba(139,90,43,0.15); color:#c4a46c; }
+    .tag-raid { background:rgba(255,50,50,0.18); color:#ff6666; }
 
     /* ===== GEARING ROUTES — Visual Overhaul ===== */
     .source-list-detail { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
@@ -416,6 +417,14 @@
     .prio-legend-owned .prio-legend-name { text-decoration:line-through; }
     /* SVG ring track */
     .prio-ring svg { position:absolute; top:0; left:0; width:100%; height:100%; }
+
+    /* ===== PHASE TOGGLE (Header) ===== */
+    #phaseToggleHeader { display:flex; justify-content:center; gap:0; margin:-2px auto 2px; }
+    .header-phase-btn { font-size:0.68rem; font-weight:600; padding:4px 14px; background:transparent; color:var(--text-dim); border:1px solid var(--border-dim); cursor:pointer; transition:all 0.2s; font-family:'Cinzel',serif; letter-spacing:0.5px; }
+    .header-phase-btn:first-child { border-radius:4px 0 0 4px; }
+    .header-phase-btn:last-child { border-radius:0 4px 4px 0; border-left:none; }
+    .header-phase-btn:hover { color:var(--text-gold); border-color:var(--border-gold); }
+    .header-phase-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-color:var(--border-gold); }
 
     /* ===== CHARACTER SHEET — BiS / My Gear Toggle ===== */
     .sheet-toggle { display:flex; gap:0; background:var(--bg-panel); border:1px solid var(--border-dim); border-radius:8px; overflow:hidden; width:fit-content; margin:0 auto; }
