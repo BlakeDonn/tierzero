@@ -248,11 +248,16 @@ var ENCHANTS = {
     {id:27967,name:"Major Striking",stats:{},src:"Enchanting",note:"+7 weapon damage"}
   ],
   twohand:[
+    {id:27971,name:"Savagery",stats:{ap:70},src:"Enchanting"},
     {id:27977,name:"Major Agility",stats:{agi:35},src:"Enchanting"},
+    {id:27984,name:"Mongoose",stats:{},src:"Enchanting",note:"Agi+haste proc"},
     {id:27975,name:"Major Spellpower",stats:{sp:40},src:"Enchanting"},
     {id:20036,name:"Major Intellect",stats:{int:30},src:"Enchanting"}
   ],
-  offhand:[],
+  offhand:"mainhand",
+  wand:[
+    {id:30260,name:"Stabilized Eternium Scope",stats:{crit:28},src:"Engineering"}
+  ],
   ring1:[
     {id:27927,name:"Spellpower",stats:{sp:12},src:"Enchanting (360+)"},
     {id:27926,name:"Healing Power",stats:{heal:20},src:"Enchanting (360+)"},
@@ -289,6 +294,7 @@ var BIS_GEMS = {
   "holy-paladin":{meta:25901,red:24029,yellow:24065,blue:24037},
   "combat-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
   "assassination-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "subtlety-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
   "bm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
   "mm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
   "survival-hunter":{meta:32409,red:24028,yellow:31868,blue:24055}
@@ -315,16 +321,17 @@ var BIS_ENCHANTS = {
   "feral-cat-druid":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27984},
   "feral-bear-druid":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,twohand:27984},
   "fury-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "arms-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27977},
+  "arms-warrior":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27971},
   "prot-warrior":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:25080,legs:29536,feet:34008,mainhand:27984},
-  "ret-paladin":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27977},
+  "ret-paladin":{head:29192,shoulders:28888,back:34003,chest:27960,wrists:34002,hands:33995,legs:29535,feet:34007,twohand:27971},
   "prot-paladin":{head:29186,shoulders:28889,back:34003,chest:46594,wrists:27914,hands:33997,legs:29536,feet:34008,mainhand:27975},
   "holy-paladin":{head:29189,shoulders:28909,back:25084,chest:27960,wrists:27917,hands:33997,legs:31372,feet:34007,mainhand:27975,ring1:27926,ring2:27926},
   "combat-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
   "assassination-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
-  "bm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977},
-  "mm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977},
-  "survival-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27977}
+  "subtlety-rogue":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,mainhand:27984,offhand:27984},
+  "bm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260},
+  "mm-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260},
+  "survival-hunter":{head:29192,shoulders:23545,back:34003,chest:27960,wrists:34002,hands:25080,legs:29535,feet:34007,twohand:27971,wand:30260}
 };
 
 // ---------------------------------------------------------------------------
@@ -445,6 +452,7 @@ var ENCHANT_COSTS = {
   46538: {type:"mats",mats:[[22445,8],[22446,4],[22449,6],[22451,2]]},   // Greater Agility (1H)
   27967: {type:"mats",mats:[[22449,2],[22446,6],[22445,6]]},     // Major Striking
   // Twohand weapon
+  27971: {type:"mats",mats:[[22449,4],[22445,40]]},              // Savagery (2H)
   27977: {type:"mats",mats:[[22449,8],[22446,6],[22445,20]]},    // Major Agility (2H)
   // Rings (require 360+ Enchanting)
   27927: {type:"mats",mats:[[22449,2],[22446,2]]},               // Spellpower (ring)
