@@ -1895,7 +1895,7 @@ function renderTrackerGemsEnchants(slotKey, item) {
 
 function renderMyGearSlot(slotKey) {
   var spec = specData();
-  var allItems = spec.slots[slotKey];
+  var allItems = getOrderedItems(slotKey);
   if (!allItems || !allItems.length) return "";
   var items = allItems.filter(function(it) { return !isItemFiltered(it); });
   if (!items.length) items = [allItems[0]];
@@ -1928,11 +1928,15 @@ function renderMyGearSlot(slotKey) {
   }
   var hasInventory = inv && (inv.bags && inv.bags.length || inv.bank && inv.bank.length);
 
-  // Upgrade count (BiS items ranked higher than equipped)
+  // Upgrade count: find tracked item's position in the ranked+filtered list
   var upgradeCount = items.length;
-  if (hasItem && !trackedItem.isCustom) {
-    var curIdx = parseInt(tracked[slotKey], 10);
-    upgradeCount = curIdx;
+  if (hasItem && trackedItem.id) {
+    for (var ui = 0; ui < items.length; ui++) {
+      if (items[ui].id === trackedItem.id) {
+        upgradeCount = ui;
+        break;
+      }
+    }
   }
 
   // Expansion count: owned items if inventory exists, else upgrade count
@@ -2018,7 +2022,7 @@ function renderMyGearSlot(slotKey) {
       html += '<button class="find-upgrades-btn" onclick="event.stopPropagation();toggleUpgrades(this)">Find Upgrades (' + upgradeCount + ')</button>';
       html += '<div class="upgrades-section" style="display:none">';
       html += '<div class="owned-divider"></div>';
-      var limit = (hasItem && !trackedItem.isCustom) ? parseInt(tracked[slotKey], 10) : items.length;
+      var limit = upgradeCount;
       var maxUpgradeVisible = 5;
       for (var i = 0; i < limit; i++) {
         var it = items[i];
@@ -2049,7 +2053,7 @@ function renderMyGearSlot(slotKey) {
     // No inventory — fall back to original behavior (BiS upgrades only)
     var maxVisible = 5;
     html += '<div class="slot-alts">';
-    var limit = (hasItem && !trackedItem.isCustom) ? parseInt(tracked[slotKey], 10) : items.length;
+    var limit = upgradeCount;
     for (var i = 0; i < limit; i++) {
       var it = items[i];
       var rc = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
