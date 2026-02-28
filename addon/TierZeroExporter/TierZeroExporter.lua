@@ -186,6 +186,93 @@ local function ScanBank()
 end
 
 -- ---------------------------------------------------------------------------
+-- Auctionator Price Export
+-- ---------------------------------------------------------------------------
+-- All gem item IDs from our database (meta, red, orange, yellow, purple, blue, green)
+local PRICE_IDS = {
+    -- Meta
+    34220, 25901, 25899, 32410, 25890, 25893, 25894, 25895, 25896, 25897, 25898, 32409, 35501, 35503,
+    -- Rare Red (Living Ruby)
+    24030, 24027, 24028, 24029, 24031, 24032, 24036,
+    -- Uncommon Red (Blood Garnet)
+    23096, 23095, 23097, 23094, 28595,
+    -- Rare Orange (Noble Topaz)
+    24059, 24058, 24061, 24060, 31867, 31868, 35316,
+    -- Uncommon Orange (Flame Spessarite)
+    23101, 23098, 23100, 23099, 31866, 31869,
+    -- Rare Yellow (Dawnstone)
+    24048, 24051, 31861, 24047, 24050, 24052, 24053, 35315,
+    -- Uncommon Yellow (Golden Draenite)
+    23114, 23113, 23115, 23116, 28290, 31860,
+    -- Rare Blue (Star of Elune)
+    24033, 24037, 24035, 24039,
+    -- Uncommon Blue (Azure Moonstone)
+    23118, 23121, 23119, 23120,
+    -- Rare Purple (Nightseye)
+    24056, 24054, 24055, 24057, 31863, 31865, 35707,
+    -- Uncommon Purple (Shadow Draenite)
+    23108, 23111, 23110, 23109, 31862, 31864,
+    -- Rare Green (Talasite)
+    24065, 24062, 35318, 33782, 24066, 24067,
+    -- Uncommon Green (Deep Peridot)
+    23104, 23105, 23106, 23103,
+    -- Enchant Materials
+    22445, 22446, 22447, 22448, 22449, 22450,  -- Arcane Dust thru Void Crystal
+    22451, 22452, 22456, 22457, 21884, 21885,   -- Primals: Air, Earth, Shadow, Mana, Fire, Water
+    -- Leg Armors (tradeable items)
+    24274, 24273, 29535, 29536,                  -- Spellthreads + Leg Armors
+    -- Crafting Materials: Primals
+    21886, 23571, 23572,                         -- Primal Life, Primal Might, Primal Nether
+    -- Crafting Materials: Tailoring Cloth
+    21842, 21845, 21881, 24271, 24272,           -- Bolt Imbued Netherweave, PMC, Netherweb Spider Silk, Spellcloth, Shadowcloth
+    -- Crafting Materials: Leatherworking
+    23793, 25699, 25707, 25708, 29539, 29547,   -- Heavy Knothide, Thick Clefthoof, Fel Hide, Cobra/Wind Scales
+    -- Crafting Materials: Blacksmithing Bars
+    23445, 23447, 23448, 23449, 23573, 22824,   -- Fel Iron, Eternium, Felsteel, Khorium, Hardened Adamantite, Felsteel Stabilizer
+    -- Crafting Materials: Jewelcrafting
+    31079, 23112, 23117, 23436, 23437, 23439,   -- Eternium Bar, gems for JC figurines
+    23440, 23441,                                -- Dawnstone, Nightseye (raw gems)
+    -- Crafting Materials: Engineering
+    23785, 23786, 23787, 16006,                  -- Adamantite Frame, Khorium Power Core, Felsteel Stabilizer, Delicate Arcanite Converter
+    -- Crafting Materials: Alchemy
+    22794, 25867, 25868, 30183,                  -- Fel Lotus, Mercurial Adamantite, Felsteel Stabilizer, Nether Vortex
+    -- Crafting Materials: Misc
+    14341, 27503,                                -- Rune Thread, special
+    -- Crafting Materials: BS weapon intermediates (crafted BoP, used as mats)
+    28428, 28431, 28437, 28440,                  -- Lionheart Blade, Mooncleaver, Dragonstrike, Thunder
+    -- BoE Crafted Items (direct AH price)
+    24266, 24262, 24250, 24252, 24253, 24254,   -- Spellstrike Hood/Pants, Tailoring BoE cloaks/bracers
+    24256, 24259,                                -- Girdle of Ruination, Vengeance Wrap
+    25685, 25686, 25687, 29506,                  -- Fel Leather set, Gloves of Living Touch
+    23517, 23518, 23519, 23520, 23521, 23522,   -- Felsteel set, Ragesteel set
+    23531, 23535, 23537, 23538, 23539, 33173,   -- BS BoE items
+    23554, 23556, 28432, 28438,                  -- BS weapons
+    24088, 24114, 24116, 24121                   -- JC BoE rings/necks
+}
+
+local function GetAuctionatorPrices()
+    local priceLines = {}
+    -- Check if Auctionator and its Database API are available
+    if not Auctionator or not Auctionator.Database then return priceLines end
+
+    local db = Auctionator.Database
+    if not db.GetPrice then return priceLines end
+
+    for _, itemId in ipairs(PRICE_IDS) do
+        local ok, price = pcall(db.GetPrice, db, tostring(itemId))
+        if ok and price and price > 0 then
+            local age = -1
+            if db.GetPriceAge then
+                local ok2, a = pcall(db.GetPriceAge, db, tostring(itemId))
+                if ok2 and a then age = a end
+            end
+            table.insert(priceLines, "PRICE:" .. itemId .. ":" .. price .. ":" .. age)
+        end
+    end
+    return priceLines
+end
+
+-- ---------------------------------------------------------------------------
 -- Export String Builder
 -- ---------------------------------------------------------------------------
 local function GemsString(gems)
@@ -195,12 +282,17 @@ end
 
 local function BuildExportString()
     local lines = {}
-    table.insert(lines, "TIERZERO:2")
+    table.insert(lines, "TIERZERO:3")
 
     local name = UnitName("player")
     local realm = GetRealmName()
     table.insert(lines, "CHAR:" .. (name or "Unknown") .. "-" .. (realm or "Unknown"))
     table.insert(lines, "SPEC:unknown")
+
+    -- Server line for AH price context
+    local realmName = GetRealmName() or "Unknown"
+    local faction = UnitFactionGroup("player") or "Unknown"
+    table.insert(lines, "SERVER:" .. realmName .. " " .. faction)
 
     -- EQ format v2: EQ:slot:itemId:name:quality:ilvl:enchantId:gem1,gem2,gem3:enchantName
     for appSlot, info in pairs(cachedEquipped) do
@@ -214,6 +306,12 @@ local function BuildExportString()
     local bankItems = TierZeroExportData.bank or {}
     for _, info in ipairs(bankItems) do
         table.insert(lines, "BANK:" .. info.id .. ":" .. info.name .. ":" .. info.quality .. ":" .. info.ilvl)
+    end
+
+    -- Auctionator price data (graceful no-op if not installed)
+    local priceLines = GetAuctionatorPrices()
+    for _, priceLine in ipairs(priceLines) do
+        table.insert(lines, priceLine)
     end
 
     table.insert(lines, "END")

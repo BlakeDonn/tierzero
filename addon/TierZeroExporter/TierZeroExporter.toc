@@ -1,8 +1,9 @@
 ## Interface: 11508, 20505
 ## Title: Tier Zero Exporter
 ## Notes: Export equipped gear, bags, and bank for Tier Zero web app
-## Version: 1.1
+## Version: 1.3
 ## Author: Tier Zero
+## OptionalDeps: Auctionator
 ## SavedVariablesPerCharacter: TierZeroExportData
 
 TierZeroExporter.lua

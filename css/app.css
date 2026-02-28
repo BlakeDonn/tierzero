@@ -25,6 +25,9 @@
     html.size-small #appWrap { zoom:1.25; }
     html.size-medium #appWrap { zoom:1.5; }
     html.size-large #appWrap { zoom:1.75; }
+    html.size-small .spec-picker-overlay { zoom:calc(1 / 1.25 * 1.5); }
+    html.size-medium .spec-picker-overlay { zoom:1; }
+    html.size-large .spec-picker-overlay { zoom:calc(1 / 1.75 * 1.5); }
     body { font-family:'Roboto',sans-serif; background:var(--bg-dark); color:var(--text-gold); min-height:100vh; line-height:1.5; }
 
     /* Header */
@@ -85,6 +88,7 @@
     .class-node .class-card-specs { background:rgba(0,0,0,0.15); }
     .spec-option { padding:7px 10px; font-size:0.72rem; color:var(--text-dim); cursor:pointer; transition:all 0.15s; border-bottom:1px solid rgba(42,42,62,0.3); display:flex; align-items:center; gap:7px; }
     .spec-icon { width:18px; height:18px; border-radius:4px; border:1px solid var(--border-dim); }
+    .spec-icon-inline { width:18px; height:18px; border-radius:3px; vertical-align:middle; margin-right:2px; }
     .spec-option:last-child { border-bottom:none; }
     .spec-option:hover { background:rgba(200,170,110,0.1); color:var(--text-gold); padding-left:14px; }
     .spec-option:hover .spec-icon { border-color:var(--border-gold); }
@@ -451,9 +455,9 @@
     .upgrades-section { border-top:none; }
 
     /* ===== Filter Modal — Checkbox ===== */
-    .filter-checkbox { display:flex; align-items:center; gap:8px; font-size:0.82rem; color:var(--text-gold); cursor:pointer; padding:4px 0; }
-    .filter-checkbox input[type="checkbox"] { accent-color:var(--border-gold); width:16px; height:16px; cursor:pointer; }
-    .filter-hint { font-size:0.7rem; color:var(--text-dim); font-weight:400; }
+    .filter-checkbox { display:flex; align-items:center; gap:10px; font-size:0.95rem; color:var(--text-gold); cursor:pointer; padding:6px 0; }
+    .filter-checkbox input[type="checkbox"] { accent-color:var(--border-gold); width:18px; height:18px; cursor:pointer; }
+    .filter-hint { font-size:0.85rem; color:var(--text-dim); font-weight:400; }
 
     /* ===== GEAR TRACKER — Typeahead ===== */
     .typeahead-wrap { flex:1; position:relative; }
@@ -502,8 +506,8 @@
 
     /* ===== Import Modal ===== */
     .import-overlay { position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; }
-    .import-panel { background:var(--bg-panel); border:2px solid var(--border-gold); border-radius:10px; padding:24px; width:560px; max-width:95vw; max-height:90vh; overflow-y:auto; }
-    .import-panel h3 { font-family:'Cinzel',serif; font-size:1.1rem; color:var(--border-gold); margin-bottom:12px; }
+    .import-panel { background:var(--bg-panel); border:2px solid var(--border-gold); border-radius:10px; padding:32px; width:560px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+    .import-panel h3 { font-family:'Cinzel',serif; font-size:1.2rem; color:var(--border-gold); margin-bottom:16px; }
     .import-panel textarea { width:100%; padding:10px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:6px; font-family:monospace; font-size:0.82rem; resize:vertical; outline:none; }
     .import-panel textarea:focus { border-color:var(--border-gold); }
     .import-panel .import-instructions { font-size:0.78rem; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
@@ -543,6 +547,11 @@
     .socket-bonus.active { color:var(--text-gold); }
     .ge-enchant { font-size:0.68rem; color:#1eff00; opacity:0.85; cursor:default; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .ge-enchant:hover { opacity:1; }
+    .enchant-cost { font-size:0.62rem; color:#5cdc78; opacity:0.7; margin-left:3px; }
+    .enchant-cost.vendor { color:#d4a017; }
+    .enchant-cost.no-data { color:var(--text-dim); opacity:0.5; }
+    .craft-cost { font-size:0.62rem; color:#ffaa44; opacity:0.8; margin-left:4px; }
+    .craft-cost.ah-price { color:#5cdc78; }
     .ge-sep { color:var(--text-dim); opacity:0.3; font-size:0.6rem; flex-shrink:0; }
 
     /* Tracker gem/enchant edit toggle */
@@ -568,12 +577,32 @@
     .enchant-select:hover, .gem-select:hover { border-color:var(--border-gold); }
 
     /* Filter Modal */
-    .filter-section { margin-bottom:14px; }
-    .filter-label { font-family:'Cinzel',serif; font-size:0.82rem; color:var(--text-gold); margin-bottom:6px; }
-    .filter-btns { display:flex; flex-wrap:wrap; gap:6px; }
-    .filter-btn { font-size:0.72rem; font-weight:600; padding:5px 12px; border-radius:16px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-slot); color:var(--text-dim); }
+    .filter-section { margin-bottom:20px; }
+    .filter-label { font-family:'Cinzel',serif; font-size:1.05rem; color:var(--text-gold); margin-bottom:10px; }
+    .filter-btns { display:flex; flex-wrap:wrap; gap:10px; }
+    .filter-btn { font-size:0.92rem; font-weight:600; padding:8px 18px; border-radius:16px; cursor:pointer; transition:all 0.2s; border:1px solid var(--border-dim); background:var(--bg-slot); color:var(--text-dim); }
     .filter-btn:hover { border-color:rgba(200,170,110,0.4); }
     .filter-btn.active { background:rgba(200,170,110,0.15); color:var(--text-gold); border-color:var(--border-gold); }
+
+    /* AH Pricing — Filter Modal */
+    .ah-price-cap-row { margin-top:6px; font-size:0.95rem; }
+    .ah-price-input { width:68px; padding:5px 8px; background:var(--bg-dark); color:var(--text-gold); border:1px solid var(--border-dim); border-radius:4px; font-size:0.95rem; text-align:right; outline:none; margin:0 5px; }
+    .ah-price-input:focus { border-color:var(--border-gold); }
+    .ah-price-input::-webkit-inner-spin-button { opacity:0.5; }
+    .ah-status-row { margin-top:10px; font-size:0.88rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .ah-status-text { color:var(--text-dim); }
+    .ah-status-text.ah-no-data { opacity:0.6; }
+    .ah-status-text.ah-stale { color:#d4a017; }
+    .ah-clear-btn { font-size:0.78rem; padding:3px 10px; background:transparent; color:var(--text-dim); border:1px solid var(--border-dim); border-radius:10px; cursor:pointer; }
+    .ah-clear-btn:hover { border-color:var(--border-gold); color:var(--text-gold); }
+    .ah-hint-override { margin-top:4px; color:#d4a017 !important; font-style:italic; font-size:0.88rem; }
+    .filter-checkbox.ah-disabled { opacity:0.5; }
+
+    /* AH Pricing — Inline Price Display */
+    .ah-price { font-size:0.65rem; padding:1px 5px; border-radius:8px; font-weight:500; }
+    .ah-price.ah-available { color:#5cdc78; background:rgba(92,220,120,0.1); }
+    .ah-price.ah-unavailable { color:#ff6b6b; background:rgba(255,107,107,0.1); font-style:italic; }
+    .ah-price.ah-stale { color:#d4a017; background:rgba(212,160,23,0.1); }
 
     /* ===== RAID SETUP ===== */
     .raid-container { display:flex; flex-direction:column; gap:16px; }

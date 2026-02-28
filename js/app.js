@@ -26,9 +26,152 @@ function toggleBudgetMode() {
   renderCurrentView();
 }
 
+// ---------------------------------------------------------------------------
+// AH Pricing Helpers
+// ---------------------------------------------------------------------------
+function getGemPriceCap() {
+  var v = localStorage.getItem("prebis-gem-price-cap");
+  return v ? parseInt(v, 10) : 0;
+}
+
+function setGemPriceCap(val) {
+  var n = parseInt(val, 10) || 0;
+  if (n <= 0) localStorage.removeItem("prebis-gem-price-cap");
+  else localStorage.setItem("prebis-gem-price-cap", String(n));
+  pendingSwaps = null;
+  showFilterModal();
+  renderCurrentView();
+}
+
+function loadAhPrices() {
+  var raw = localStorage.getItem("prebis-ah-prices");
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
+
+function clearAhPrices() {
+  localStorage.removeItem("prebis-ah-prices");
+  pendingSwaps = null;
+  showFilterModal();
+  renderCurrentView();
+}
+
+function getEnchantCost(enchId, ahPrices) {
+  if (typeof ENCHANT_COSTS === "undefined") return null;
+  var info = ENCHANT_COSTS[enchId];
+  if (!info) return null;
+  if (info.type === "vendor") return info.gold * 10000; // copper
+  if (info.type === "item") {
+    if (!ahPrices || !ahPrices.prices) return null;
+    var entry = ahPrices.prices[String(info.itemId)];
+    return entry ? entry.price : null;
+  }
+  if (info.type === "mats") {
+    if (!ahPrices || !ahPrices.prices) return null;
+    var total = 0;
+    for (var i = 0; i < info.mats.length; i++) {
+      var entry = ahPrices.prices[String(info.mats[i][0])];
+      if (!entry) return null; // can't price if any mat missing
+      total += entry.price * info.mats[i][1];
+    }
+    return total; // copper
+  }
+  return null;
+}
+
+function isGemAffordable(gemId, priceCap, ahPrices) {
+  if (!priceCap || priceCap <= 0) return true;
+  if (!ahPrices || !ahPrices.prices) return true;
+  var entry = ahPrices.prices[String(gemId)];
+  if (!entry) return false; // not on AH = unavailable
+  return entry.price <= priceCap * 10000; // convert gold to copper
+}
+
+function getGemAhPrice(gemId, ahPrices) {
+  if (!ahPrices || !ahPrices.prices) return null;
+  var entry = ahPrices.prices[String(gemId)];
+  return entry ? entry : null;
+}
+
+function formatGoldPrice(copper) {
+  if (!copper || copper <= 0) return "0g";
+  var gold = Math.floor(copper / 10000);
+  var silver = Math.floor((copper % 10000) / 100);
+  if (gold > 0 && silver > 0) return gold + "g " + silver + "s";
+  if (gold > 0) return gold + "g";
+  return silver + "s";
+}
+
+function getAffordableGem(socketColor, specSlug) {
+  var priceCap = getGemPriceCap();
+  var ahPrices = loadAhPrices();
+  var base = BIS_GEMS[specSlug];
+  if (!base) return null;
+  var bisGemId = base[socketColor];
+
+  // No price cap or no AH data: return BiS gem
+  if (!priceCap || priceCap <= 0 || !ahPrices || !ahPrices.prices) return bisGemId;
+
+  // Meta gems: always use BiS regardless of price cap
+  if (socketColor === "meta") return bisGemId;
+
+  // Check if BiS gem is affordable and available
+  if (isGemAffordable(bisGemId, priceCap, ahPrices)) return bisGemId;
+
+  // Score all alternative gems that fit this socket, are affordable, and available
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return bisGemId; // no weights = can't score, fallback to BiS
+
+  var candidates = [];
+  var gemIds = Object.keys(GEMS);
+  for (var i = 0; i < gemIds.length; i++) {
+    var id = gemIds[i];
+    var gem = GEMS[id];
+    if (gem.color === "meta") continue;
+    if (!gemFits(gem.color, socketColor)) continue;
+    if (!isGemAffordable(id, priceCap, ahPrices)) continue;
+
+    var score = 0;
+    var statKeys = Object.keys(gem.stats);
+    for (var s = 0; s < statKeys.length; s++) {
+      score += (weights[statKeys[s]] || 0) * gem.stats[statKeys[s]];
+    }
+    candidates.push({ id: parseInt(id, 10), score: score });
+  }
+
+  // Sort by score descending
+  candidates.sort(function(a, b) { return b.score - a.score; });
+
+  // If all candidates score 0 or below, pick cheapest available
+  if (candidates.length > 0 && candidates[0].score <= 0) {
+    candidates.sort(function(a, b) {
+      var pa = getGemAhPrice(a.id, ahPrices);
+      var pb = getGemAhPrice(b.id, ahPrices);
+      return (pa ? pa.price : 999999999) - (pb ? pb.price : 999999999);
+    });
+  }
+
+  return candidates.length > 0 ? candidates[0].id : bisGemId;
+}
+
 function getActiveBisGems(specSlug) {
   var base = BIS_GEMS[specSlug];
-  if (!base || !isBudgetMode() || typeof BUDGET_GEM_MAP === "undefined") return base;
+  if (!base) return base;
+
+  // Price cap takes priority over budget mode when AH data exists
+  var priceCap = getGemPriceCap();
+  var ahPrices = loadAhPrices();
+  if (priceCap > 0 && ahPrices && ahPrices.prices) {
+    var result = {};
+    var keys = Object.keys(base);
+    for (var i = 0; i < keys.length; i++) {
+      result[keys[i]] = getAffordableGem(keys[i], specSlug);
+    }
+    return result;
+  }
+
+  // Budget mode fallback
+  if (!isBudgetMode() || typeof BUDGET_GEM_MAP === "undefined") return base;
   var result = {};
   var keys = Object.keys(base);
   for (var i = 0; i < keys.length; i++) {
@@ -43,6 +186,8 @@ function getActiveBisEnchant(specSlug, slotKey) {
   if (!bisEnchants) return null;
   var enchId = bisEnchants[slotKey];
   if (!enchId) return null;
+  // Ring enchants require Enchanting profession
+  if ((slotKey === "ring1" || slotKey === "ring2") && loadProfessions().indexOf("Enchanting") === -1) return null;
   if (!isBudgetMode() || typeof BUDGET_ENCHANT_MAP === "undefined") return enchId;
   if (!(enchId in BUDGET_ENCHANT_MAP)) return enchId;
   return BUDGET_ENCHANT_MAP[enchId]; // null means skip
@@ -51,7 +196,7 @@ function getActiveBisEnchant(specSlug, slotKey) {
 // ---------------------------------------------------------------------------
 // Profession Filters
 // ---------------------------------------------------------------------------
-const ALL_PROFESSIONS = ["Tailoring","Blacksmithing","Leatherworking","Jewelcrafting","Alchemy","Engineering"];
+const ALL_PROFESSIONS = ["Tailoring","Blacksmithing","Leatherworking","Jewelcrafting","Alchemy","Engineering","Enchanting"];
 
 function loadProfessions() {
   try {
@@ -143,7 +288,7 @@ function showFilterModal() {
   var profs = loadProfessions();
 
   var html = '<div class="import-overlay" id="filterOverlay" onclick="if(event.target===this)closeFilterModal()">';
-  html += '<div class="import-panel" style="width:440px;">';
+  html += '<div class="import-panel" style="width:680px;">';
   html += '<h3>&#9881; Filters</h3>';
 
   // Faction
@@ -175,10 +320,49 @@ function showFilterModal() {
   }
   html += '</div></div>';
 
-  // Optimizer — Budget Mode
+  // Optimizer — Budget Mode + Gem Price Cap
+  var priceCap = getGemPriceCap();
+  var ahData = loadAhPrices();
+  var hasPriceCapActive = priceCap > 0 && ahData && ahData.prices;
+
   html += '<div class="filter-section">';
   html += '<div class="filter-label">Optimizer</div>';
-  html += '<label class="filter-checkbox"><input type="checkbox"' + (isBudgetMode() ? ' checked' : '') + ' onchange="toggleBudgetMode()"> Budget Mode <span class="filter-hint">— Uncommon gems &amp; Honored enchants</span></label>';
+  html += '<label class="filter-checkbox' + (hasPriceCapActive ? ' ah-disabled' : '') + '"><input type="checkbox"' + (isBudgetMode() ? ' checked' : '') + (hasPriceCapActive ? ' disabled' : '') + ' onchange="toggleBudgetMode()"> Budget Mode <span class="filter-hint">— Uncommon gems &amp; Honored enchants</span></label>';
+  if (hasPriceCapActive) {
+    html += '<div class="filter-hint ah-hint-override">Price cap provides smarter gem selection</div>';
+  }
+
+  // Gem Price Cap
+  html += '<div class="ah-price-cap-row">';
+  html += '<label class="filter-checkbox" style="margin-top:8px;">Max gem price: <input type="number" min="0" max="9999" step="1" class="ah-price-input" value="' + (priceCap || '') + '" placeholder="0" onchange="setGemPriceCap(this.value)" onkeyup="if(event.key===\'Enter\')setGemPriceCap(this.value)"> <span class="filter-hint">g (0 = no limit)</span></label>';
+  html += '</div>';
+
+  // AH Data Status
+  html += '<div class="ah-status-row">';
+  if (ahData && ahData.prices) {
+    var allPriceIds = Object.keys(ahData.prices);
+    var enchMatIds = {22445:1,22446:1,22447:1,22448:1,22449:1,22450:1,24274:1,24273:1,29535:1,29536:1};
+    var craftMatIds = {21842:1,21845:1,21881:1,21884:1,21885:1,21886:1,22451:1,22452:1,22456:1,22457:1,22824:1,23112:1,23117:1,23436:1,23437:1,23439:1,23440:1,23441:1,23445:1,23447:1,23448:1,23449:1,23571:1,23572:1,23573:1,23785:1,23786:1,23787:1,23793:1,24271:1,24272:1,25699:1,25707:1,25708:1,29539:1,29547:1,31079:1,14341:1,16006:1,22794:1,25867:1,25868:1,27503:1,28428:1,28431:1,28437:1,28440:1,30183:1};
+    var gemCount = 0, enchMatCount = 0, craftMatCount = 0;
+    for (var pi = 0; pi < allPriceIds.length; pi++) {
+      var pid = allPriceIds[pi];
+      if (enchMatIds[pid]) enchMatCount++;
+      else if (craftMatIds[pid]) craftMatCount++;
+      else gemCount++;
+    }
+    var importAge = ahData.importTime ? Math.floor((Date.now() / 1000 - ahData.importTime) / 86400) : -1;
+    var ageText = importAge === 0 ? 'today' : (importAge === 1 ? '1 day ago' : importAge + ' days ago');
+    var staleClass = importAge > 7 ? ' ah-stale' : '';
+    var countText = gemCount + ' gems';
+    if (enchMatCount > 0) countText += ', ' + enchMatCount + ' enchant mats';
+    if (craftMatCount > 0) countText += ', ' + craftMatCount + ' craft mats';
+    html += '<span class="ah-status-text' + staleClass + '">AH Data: ' + (ahData.server || 'Unknown') + ' (' + countText + ', imported ' + ageText + ')</span>';
+    html += ' <button class="ah-clear-btn" onclick="clearAhPrices()">Clear</button>';
+  } else {
+    html += '<span class="ah-status-text ah-no-data">AH Data: None — import via /tz addon with Auctionator</span>';
+  }
+  html += '</div>';
+
   html += '</div>';
 
   html += '<div class="import-btn-row" style="margin-top:16px;">';
@@ -589,7 +773,9 @@ function showMainUI() {
   var classColorMap = {"Mage":"var(--mage-color)","Paladin":"var(--paladin-color)","Warrior":"var(--warrior-color)","Rogue":"var(--rogue-color)","Hunter":"var(--hunter-color)","Warlock":"var(--warlock-color)","Priest":"var(--priest-color)","Shaman":"var(--shaman-color)","Druid":"var(--druid-color)"};
   var classColor = classColorMap[spec.class] || spec.classColor;
   var hSpec = document.getElementById("headerSpec");
-  hSpec.innerHTML = '<span class="spec-name" style="color:' + classColor + '">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</span>' +
+  var specIconFile = (SPEC_ICONS[spec.class] || {})[spec.spec] || '';
+  var specIconImg = specIconFile ? '<img class="spec-icon-inline" src="' + WOW_ICON + specIconFile + '.jpg"> ' : '';
+  hSpec.innerHTML = '<span class="spec-name" style="color:' + classColor + '">' + specIconImg + spec.spec + ' ' + spec.class + '</span>' +
     '<button class="change-spec-btn" onclick="showSpecPicker()">Change Spec</button>';
   document.getElementById("viewTabs").style.display = "";
   // Re-activate current view
@@ -735,52 +921,116 @@ function itemScore(item, specSlug) {
   return Math.round(score * 10) / 10;
 }
 
-// Cap-aware delta: scores only the useful portion of hit/def (up to cap)
-// otherCapTotal = cap stat from all other slots (excluding the slot being compared)
-// capVal = the cap value (e.g. 142 for hit)
-function capAwareDelta(item, refItem, specSlug, otherCapTotal, capKey, capVal) {
+// Build combined stats: base item + BiS gems + socket bonus + enchant
+// Evaluate both gem strategies and return the contribution from the better one.
+// Strategy 1: match socket colors → get socket bonus.
+// Strategy 2: jam the single highest-scoring gem in every non-meta socket → skip bonus.
+function bestGemContribution(item, bisGems, specSlug) {
+  if (!item.sockets || item.sockets.length === 0) return {};
+
+  // Strategy 1: color-matched
+  var matchStats = {};
+  var allMatch = true;
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    var gemId = bisGems[sc];
+    var gem = gemId ? GEMS[gemId] : null;
+    if (gem && gem.stats) addStats(matchStats, gem.stats);
+    if (!gem || !gemFits(gem.color, sc)) allMatch = false;
+  }
+  if (allMatch && item.socketBonus) addStats(matchStats, item.socketBonus);
+
+  // Strategy 2: jam best single gem everywhere (except meta)
   var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
-  if (!weights) return itemScore(item, specSlug) - itemScore(refItem, specSlug);
+  if (!weights) return matchStats;
+  var colors = ["red", "orange", "yellow", "green", "blue", "purple"];
+  var bestGemStats = null;
+  var bestGemScore = -1;
+  for (var c = 0; c < colors.length; c++) {
+    var gid = bisGems[colors[c]];
+    var g = gid ? GEMS[gid] : null;
+    if (!g || !g.stats) continue;
+    var sc = 0;
+    var ks = Object.keys(g.stats);
+    for (var j = 0; j < ks.length; j++) sc += (weights[ks[j]] || 0) * g.stats[ks[j]];
+    if (sc > bestGemScore) { bestGemScore = sc; bestGemStats = g.stats; }
+  }
+  if (!bestGemStats) return matchStats;
+
+  var jamStats = {};
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    if (sc === "meta") {
+      var metaId = bisGems.meta;
+      var meta = metaId ? GEMS[metaId] : null;
+      if (meta && meta.stats) addStats(jamStats, meta.stats);
+    } else {
+      addStats(jamStats, bestGemStats);
+    }
+  }
+
+  // Pick whichever scores higher
+  var matchScore = itemScore({ stats: matchStats }, specSlug);
+  var jamScore = itemScore({ stats: jamStats }, specSlug);
+  return matchScore >= jamScore ? matchStats : jamStats;
+}
+
+function getItemFullStats(item, specSlug, slotKey) {
+  var stats = {};
+  if (!item) return stats;
+  if (item.stats) addStats(stats, item.stats);
+  // Gems — best of color-match vs jam
+  var bisGems = getActiveBisGems(specSlug);
+  if (bisGems && item.sockets) {
+    addStats(stats, bestGemContribution(item, bisGems, specSlug));
+  }
+  // Enchant
+  if (slotKey) {
+    var enchId = getActiveBisEnchant(specSlug, slotKey);
+    if (enchId) {
+      var ench = findEnchantById(slotKey, enchId);
+      if (ench && ench.stats) addStats(stats, ench.stats);
+    }
+  }
+  return stats;
+}
+
+// Score with full stats (base + gems + socket bonus + enchant)
+function fullItemScore(item, specSlug, slotKey) {
+  if (!item) return 0;
+  var stats = getItemFullStats(item, specSlug, slotKey);
+  return itemScore({ stats: stats }, specSlug);
+}
+
+// Score stats object with cap-aware hit/def
+function scoreStats(stats, specSlug, otherCapTotal, capKey, capVal) {
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return 0;
   var spec = SPECS[specSlug];
-  if (!spec) return itemScore(item, specSlug) - itemScore(refItem, specSlug);
-
-  var capWeight = capAwareWeight(capKey, spec, weights);
-  var scoreA = 0, scoreB = 0;
-
-  // Score item A
-  if (item && item.stats) {
-    var ks = Object.keys(item.stats);
-    for (var i = 0; i < ks.length; i++) {
-      var k = ks[i], v = item.stats[k];
-      if (k === capKey && capVal) {
-        var useful = Math.max(0, Math.min(v, capVal - otherCapTotal));
-        scoreA += useful * capWeight;
-      } else if (k === "hit" || k === "def") {
-        // The other cap stat (e.g. def when capKey is hit) — no cap context, use flat
-        scoreA += capAwareWeight(k, spec, weights) * v;
-      } else {
-        scoreA += (weights[k] || 0) * v;
-      }
+  if (!spec) return 0;
+  var capWeight = capKey ? capAwareWeight(capKey, spec, weights) : 0;
+  var score = 0;
+  var keys = Object.keys(stats);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i], v = stats[k];
+    if (k === capKey && capVal) {
+      var useful = Math.max(0, Math.min(v, capVal - otherCapTotal));
+      score += useful * capWeight;
+    } else if (k === "hit" || k === "def") {
+      score += capAwareWeight(k, spec, weights) * v;
+    } else {
+      score += (weights[k] || 0) * v;
     }
   }
+  return Math.round(score * 10) / 10;
+}
 
-  // Score item B (reference)
-  if (refItem && refItem.stats) {
-    var ks2 = Object.keys(refItem.stats);
-    for (var i = 0; i < ks2.length; i++) {
-      var k = ks2[i], v = refItem.stats[k];
-      if (k === capKey && capVal) {
-        var useful = Math.max(0, Math.min(v, capVal - otherCapTotal));
-        scoreB += useful * capWeight;
-      } else if (k === "hit" || k === "def") {
-        scoreB += capAwareWeight(k, spec, weights) * v;
-      } else {
-        scoreB += (weights[k] || 0) * v;
-      }
-    }
-  }
-
-  return Math.round((scoreA - scoreB) * 10) / 10;
+// Cap-aware delta using full item stats (base + gems + socket bonus + enchant)
+function capAwareDelta(item, refItem, specSlug, otherCapTotal, capKey, capVal, slotKey) {
+  var statsA = getItemFullStats(item, specSlug, slotKey);
+  var statsB = getItemFullStats(refItem, specSlug, slotKey);
+  return Math.round((scoreStats(statsA, specSlug, otherCapTotal, capKey, capVal) -
+                      scoreStats(statsB, specSlug, otherCapTotal, capKey, capVal)) * 10) / 10;
 }
 
 // Get cap stat total from all slots except excludeSlot (includes gems, socket bonuses, enchants)
@@ -796,8 +1046,7 @@ function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
   // Load tracker data once for mygear mode
   var trackedGems = (mode === "mygear") ? loadTrackerGems() : null;
   var trackedEnchants = (mode === "mygear") ? loadTrackerEnchants() : null;
-  var bisGems = (mode === "bis") ? BIS_GEMS[specSlug] : null;
-  var bisEnchants = (mode === "bis") ? BIS_ENCHANTS[specSlug] : null;
+  var bisGems = (mode === "bis") ? getActiveBisGems(specSlug) : null;
 
   for (var i = 0; i < slotKeys.length; i++) {
     var sk = slotKeys[i];
@@ -849,26 +1098,14 @@ function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
         if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
       }
     } else {
-      // BiS mode: use BIS_GEMS and BIS_ENCHANTS
+      // BiS mode: use best gem strategy + budget-aware enchants
       if (bisGems && item && item.sockets) {
-        var allMatch = true;
-        for (var g = 0; g < item.sockets.length; g++) {
-          var sc = item.sockets[g];
-          var gId = bisGems[sc];
-          if (gId) {
-            var gem = GEMS[gId];
-            if (gem && gem.stats && gem.stats[capKey]) total += gem.stats[capKey];
-            if (!gem || !gemFits(gem.color, sc)) allMatch = false;
-          } else {
-            allMatch = false;
-          }
-        }
-        if (allMatch && item.socketBonus && item.socketBonus[capKey]) {
-          total += item.socketBonus[capKey];
-        }
+        var gemContrib = bestGemContribution(item, bisGems, specSlug);
+        if (gemContrib[capKey]) total += gemContrib[capKey];
       }
-      if (bisEnchants && bisEnchants[sk]) {
-        var ench = findEnchantById(sk, bisEnchants[sk]);
+      var enchId = getActiveBisEnchant(specSlug, sk);
+      if (enchId) {
+        var ench = findEnchantById(sk, enchId);
         if (ench && ench.stats && ench.stats[capKey]) total += ench.stats[capKey];
       }
     }
@@ -876,15 +1113,18 @@ function getOtherSlotCapStat(excludeSlot, capKey, specSlug, mode) {
   return total;
 }
 
-function scoreBreakdownTooltip(item, refItem, specSlug, otherCapTotal, capKey, capVal) {
+function scoreBreakdownTooltip(item, refItem, specSlug, otherCapTotal, capKey, capVal, slotKey) {
   var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
   if (!weights) return '';
   var spec = SPECS[specSlug];
   if (!spec) return '';
-  // Collect all stat keys from both items
+  // Use full stats (base + gems + socket bonus + enchant)
+  var statsA = getItemFullStats(item, specSlug, slotKey);
+  var statsB = getItemFullStats(refItem, specSlug, slotKey);
+  // Collect all stat keys
   var allKeys = {};
-  if (item && item.stats) { var ks = Object.keys(item.stats); for (var i = 0; i < ks.length; i++) allKeys[ks[i]] = true; }
-  if (refItem && refItem.stats) { var ks2 = Object.keys(refItem.stats); for (var i = 0; i < ks2.length; i++) allKeys[ks2[i]] = true; }
+  var ksA = Object.keys(statsA); for (var i = 0; i < ksA.length; i++) allKeys[ksA[i]] = true;
+  var ksB = Object.keys(statsB); for (var i = 0; i < ksB.length; i++) allKeys[ksB[i]] = true;
   var lines = [];
   var sorted = Object.keys(allKeys).sort(function(a, b) {
     var wa = (a === "hit" || a === "def") ? capAwareWeight(a, spec, weights) : (weights[a] || 0);
@@ -895,8 +1135,8 @@ function scoreBreakdownTooltip(item, refItem, specSlug, otherCapTotal, capKey, c
     var k = sorted[i];
     var w = (k === "hit" || k === "def") ? capAwareWeight(k, spec, weights) : (weights[k] || 0);
     if (w === 0) continue;
-    var vA = (item && item.stats && item.stats[k]) ? item.stats[k] : 0;
-    var vB = (refItem && refItem.stats && refItem.stats[k]) ? refItem.stats[k] : 0;
+    var vA = statsA[k] || 0;
+    var vB = statsB[k] || 0;
     // Cap-aware contribution for the cap stat
     if (k === capKey && capVal && otherCapTotal !== undefined) {
       var usefulA = Math.max(0, Math.min(vA, capVal - otherCapTotal));
@@ -938,7 +1178,7 @@ function computeBisScore() {
     var sk = slotKeys[i];
     if (sk === "twohand" && hasMainhand) continue;
     if ((sk === "mainhand" || sk === "offhand") && hasTwohand && !hasMainhand) continue;
-    total += itemScore(bisItem(sk), specSlug);
+    total += fullItemScore(bisItem(sk), specSlug, sk);
   }
   return Math.round(total * 10) / 10;
 }
@@ -957,7 +1197,7 @@ function computeTrackerScore() {
     if (sk === "twohand" && hasTrackedMainhand) continue;
     if ((sk === "mainhand" || sk === "offhand") && hasTrackedTwohand && !hasTrackedMainhand) continue;
     var item = getTrackedItem(sk);
-    if (item) total += itemScore(item, specSlug);
+    if (item) total += fullItemScore(item, specSlug, sk);
   }
   return Math.round(total * 10) / 10;
 }
@@ -1004,13 +1244,25 @@ function toggleUpgrades(btn) {
   if (!showing) refreshWowheadLinks();
 }
 
-function gemTooltipText(gem) {
+function gemTooltipText(gem, gemId) {
   if (!gem) return '';
   var parts = [];
   var sks = Object.keys(gem.stats);
   for (var k = 0; k < sks.length; k++) parts.push('+' + gem.stats[sks[k]] + ' ' + (STAT_NAMES[sks[k]] || sks[k]));
   if (gem.effect) parts.push(gem.effect);
-  return gem.name + (parts.length ? '\n' + parts.join(', ') : '');
+  var text = gem.name + (parts.length ? '\n' + parts.join(', ') : '');
+  // Add AH price info if available
+  if (gemId) {
+    var ahPrices = loadAhPrices();
+    var priceInfo = getGemAhPrice(gemId, ahPrices);
+    if (priceInfo) {
+      text += '\nAH: ' + formatGoldPrice(priceInfo.price);
+      if (priceInfo.age >= 0) text += ' (seen ' + (priceInfo.age === 0 ? 'today' : priceInfo.age + 'd ago') + ')';
+    } else if (ahPrices) {
+      text += '\nNot seen on AH';
+    }
+  }
+  return text;
 }
 
 function enchantTooltipText(ench) {
@@ -1024,7 +1276,57 @@ function enchantTooltipText(ench) {
   var tip = ench.name;
   if (parts.length) tip += '\n' + parts.join(', ');
   if (ench.src) tip += '\n' + ench.src;
+  var cost = getEnchantCost(ench.id, loadAhPrices());
+  if (cost != null) tip += '\n~' + formatGoldPrice(cost);
   return tip;
+}
+
+function enchantCostSpan(enchId) {
+  var ahPrices = loadAhPrices();
+  var cost = getEnchantCost(enchId, ahPrices);
+  if (cost == null) {
+    // Show vendor cost even without AH data
+    if (typeof ENCHANT_COSTS !== "undefined" && ENCHANT_COSTS[enchId] && ENCHANT_COSTS[enchId].type === "vendor") {
+      return ' <span class="enchant-cost vendor">~' + formatGoldPrice(ENCHANT_COSTS[enchId].gold * 10000) + '</span>';
+    }
+    return '';
+  }
+  var cls = (typeof ENCHANT_COSTS !== "undefined" && ENCHANT_COSTS[enchId] && ENCHANT_COSTS[enchId].type === "vendor") ? "vendor" : "";
+  return ' <span class="enchant-cost' + (cls ? ' ' + cls : '') + '">~' + formatGoldPrice(cost) + '</span>';
+}
+
+function getCraftCost(itemId, ahPrices) {
+  if (typeof CRAFT_COSTS === "undefined") return null;
+  var info = CRAFT_COSTS[itemId];
+  if (!info) return null;
+  if (!ahPrices || !ahPrices.prices) return null;
+  var total = 0;
+  for (var i = 0; i < info.mats.length; i++) {
+    var entry = ahPrices.prices[String(info.mats[i][0])];
+    if (!entry) return null; // can't price if any mat missing
+    total += entry.price * info.mats[i][1];
+  }
+  return total; // copper
+}
+
+function craftCostSpan(item) {
+  if (typeof CRAFT_COSTS === "undefined") return '';
+  var info = CRAFT_COSTS[item.id];
+  if (!info) return '';
+  var ahPrices = loadAhPrices();
+  // For BoE items: show AH buy price if available, mat cost as fallback
+  if (info.boe && ahPrices && ahPrices.prices) {
+    var ahEntry = ahPrices.prices[String(item.id)];
+    if (ahEntry && ahEntry.price > 0) {
+      return ' <span class="craft-cost ah-price">~' + formatGoldPrice(ahEntry.price) + '</span>';
+    }
+  }
+  // Show mat cost
+  var matCost = getCraftCost(item.id, ahPrices);
+  if (matCost != null) {
+    return ' <span class="craft-cost">~' + formatGoldPrice(matCost) + '</span>';
+  }
+  return '';
 }
 
 function renderBisGemsEnchants(slotKey, item) {
@@ -1033,7 +1335,8 @@ function renderBisGemsEnchants(slotKey, item) {
   var bisEnchants = BIS_ENCHANTS[specSlug];
   var hasGems = item.sockets && item.sockets.length && bisGems;
   var ench = null;
-  if (bisEnchants && bisEnchants[slotKey]) ench = findEnchantById(slotKey, bisEnchants[slotKey]);
+  var activeEnchId = getActiveBisEnchant(specSlug, slotKey);
+  if (activeEnchId) ench = findEnchantById(slotKey, activeEnchId);
   if (!hasGems && !ench) return '';
 
   var html = '<div class="ge-row">';
@@ -1047,7 +1350,7 @@ function renderBisGemsEnchants(slotKey, item) {
       var gemId = bisGems[sc];
       var gem = gemId ? GEMS[gemId] : null;
       var gemColor = gem ? gem.color : sc;
-      var tip = gemTooltipText(gem);
+      var tip = gemTooltipText(gem, gemId);
       html += '<span class="gem-socket ' + gemColor + ' filled" title="' + tip.replace(/"/g, '&quot;') + '"></span>';
     }
     if (item.socketBonus) {
@@ -1066,7 +1369,8 @@ function renderBisGemsEnchants(slotKey, item) {
   if (ench) {
     if (hasGems) html += '<span class="ge-sep">|</span>';
     var tip2 = enchantTooltipText(ench);
-    html += '<span class="ge-enchant" title="' + tip2.replace(/"/g, '&quot;') + '">' + ench.name + '</span>';
+    var costHtml = enchantCostSpan(ench.id);
+    html += '<span class="ge-enchant" title="' + tip2.replace(/"/g, '&quot;') + '">' + ench.name + costHtml + '</span>';
   }
 
   html += '</div>';
@@ -1093,8 +1397,8 @@ function renderGearSlot(slotKey) {
   html += '<div class="slot-bis">';
   html += '<div class="slot-label">' + label + '</div>';
   html += '<div class="item-link">' + itemLink(top) + '</div>';
-  html += '<div class="item-src">' + top.src + ' ' + sourceTag(top.src);
-  if (hasStatWeights(currentSpec)) html += ' <span class="slot-score">' + itemScore(top, currentSpec) + '</span>';
+  html += '<div class="item-src">' + top.src + ' ' + sourceTag(top.src) + craftCostSpan(top);
+  if (hasStatWeights(currentSpec)) html += ' <span class="slot-score">' + fullItemScore(top, currentSpec, slotKey) + '</span>';
   html += '</div>';
   html += renderBisGemsEnchants(slotKey, top);
   html += '</div>';
@@ -1123,13 +1427,13 @@ function renderGearSlot(slotKey) {
       }
       html += '<div class="alt-info">';
       html += '<div class="alt-name">' + itemLink(it) + '</div>';
-      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
       html += '</div>';
       if (hasStatWeights(currentSpec)) {
-        var delta = capKey ? capAwareDelta(it, top, currentSpec, otherCapTotal, capKey, capVal) : (itemScore(it, currentSpec) - itemScore(top, currentSpec));
+        var delta = capKey ? capAwareDelta(it, top, currentSpec, otherCapTotal, capKey, capVal, slotKey) : (fullItemScore(it, currentSpec, slotKey) - fullItemScore(top, currentSpec, slotKey));
         var sign = delta > 0 ? '+' : '';
         var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
-        var tip = scoreBreakdownTooltip(it, top, currentSpec, otherCapTotal, capKey, capVal);
+        var tip = scoreBreakdownTooltip(it, top, currentSpec, otherCapTotal, capKey, capVal, slotKey);
         html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
       }
       html += '</div>';
@@ -1213,7 +1517,7 @@ function computeBisStats() {
     }
   }
 
-  // Add BiS enchant stats
+  // Add BiS enchant stats (respects profession filters via getActiveBisEnchant)
   var bisEnchants = BIS_ENCHANTS[specSlug];
   if (bisEnchants) {
     var enchSlots = Object.keys(bisEnchants);
@@ -1222,7 +1526,9 @@ function computeBisStats() {
       // Skip weapon enchants using same logic as items
       if (eSlot === "twohand" && hasMainhand) continue;
       if ((eSlot === "mainhand" || eSlot === "offhand") && hasTwohand && !hasMainhand) continue;
-      var ench = findEnchantById(eSlot, bisEnchants[eSlot]);
+      var activeEnchId = getActiveBisEnchant(specSlug, eSlot);
+      if (!activeEnchId) continue;
+      var ench = findEnchantById(eSlot, activeEnchId);
       if (ench && ench.stats) addStats(stats, ench.stats);
     }
   }
@@ -1456,7 +1762,7 @@ function renderTrackerGemsEnchants(slotKey, item) {
       var gem = gId ? GEMS[gId] : null;
       var gemColor = gem ? gem.color : sc;
       var filled = gId ? ' filled' : '';
-      var tip = gem ? gemTooltipText(gem) : (gId ? 'Unknown Gem (ID: ' + gId + ')' : sc.charAt(0).toUpperCase() + sc.slice(1) + ' socket (empty)');
+      var tip = gem ? gemTooltipText(gem, gId) : (gId ? 'Unknown Gem (ID: ' + gId + ')' : sc.charAt(0).toUpperCase() + sc.slice(1) + ' socket (empty)');
       html += '<span class="gem-socket ' + gemColor + filled + '" title="' + tip.replace(/"/g, '&quot;') + '"></span>';
     }
     if (item.socketBonus) {
@@ -1479,7 +1785,7 @@ function renderTrackerGemsEnchants(slotKey, item) {
     if (hasGems) html += '<span class="ge-sep">|</span>';
     if (ench) {
       var tip2 = enchantTooltipText(ench);
-      html += '<span class="ge-enchant" title="' + tip2.replace(/"/g, '&quot;') + '">' + ench.name + '</span>';
+      html += '<span class="ge-enchant" title="' + tip2.replace(/"/g, '&quot;') + '">' + ench.name + enchantCostSpan(curEnch) + '</span>';
     } else {
       html += '<span class="ge-enchant">Unknown Enchant (ID: ' + curEnch + ')</span>';
     }
@@ -1655,13 +1961,13 @@ function renderMyGearSlot(slotKey) {
         html += '<div class="alt-rank owned-rank">&#128092;</div>';
         html += '<div class="alt-info">';
         html += '<div class="alt-name">' + itemLink(it) + '</div>';
-        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
         html += '</div>';
         if (hasStatWeights(currentSpec)) {
-          var delta = mgCapKey ? capAwareDelta(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal) : (itemScore(it, currentSpec) - itemScore(trackedItem, currentSpec));
+          var delta = mgCapKey ? capAwareDelta(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey) : (fullItemScore(it, currentSpec, slotKey) - fullItemScore(trackedItem, currentSpec, slotKey));
           var sign = delta > 0 ? '+' : '';
           var cls = delta >= 0 ? 'delta-pos' : 'delta-neg';
-          var tip = scoreBreakdownTooltip(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal);
+          var tip = scoreBreakdownTooltip(it, trackedItem, currentSpec, mgOtherCap, mgCapKey, mgCapVal, slotKey);
           html += '<div class="alt-score ' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + sign + delta.toFixed(1) + '</div>';
         }
         html += '</div>';
@@ -1688,7 +1994,7 @@ function renderMyGearSlot(slotKey) {
         html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
         html += '<div class="alt-info">';
         html += '<div class="alt-name">' + itemLink(it) + '</div>';
-        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+        html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
         html += '</div></div>';
       }
       if (limit > maxUpgradeVisible) {
@@ -1710,7 +2016,7 @@ function renderMyGearSlot(slotKey) {
       html += '<div class="alt-rank ' + rc + '">' + (i+1) + '</div>';
       html += '<div class="alt-info">';
       html += '<div class="alt-name">' + itemLink(it) + '</div>';
-      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + '</div>';
+      html += '<div class="alt-src">' + it.src + ' ' + sourceTag(it.src) + craftCostSpan(it) + '</div>';
       html += '</div></div>';
     }
     if (limit > maxVisible) {
@@ -1727,6 +2033,8 @@ function renderSheet() {
   var bis = spec.slots;
   var classColorMap = {"Mage":"var(--mage-color)","Paladin":"var(--paladin-color)","Warrior":"var(--warrior-color)","Rogue":"var(--rogue-color)","Hunter":"var(--hunter-color)","Warlock":"var(--warlock-color)","Priest":"var(--priest-color)","Shaman":"var(--shaman-color)","Druid":"var(--druid-color)"};
   var classColor = classColorMap[spec.class] || spec.classColor;
+  var specIconFile = (SPEC_ICONS[spec.class] || {})[spec.spec] || '';
+  var specIconImg = specIconFile ? '<img class="spec-icon-inline" src="' + WOW_ICON + specIconFile + '.jpg"> ' : '';
 
   // Toggle switch
   var toggleHtml = '<div class="sheet-toggle">';
@@ -1802,7 +2110,7 @@ function renderSheet() {
       myScoreHtml = '<div class="total-score">Your Score: ' + myScore.toLocaleString() + ' / BiS: ' + bisScore.toLocaleString() + ' (' + pct + '%)</div>';
     }
     centerHtml += '<div class="character-model compact">' +
-      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
+      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + specIconImg + spec.spec + ' ' + spec.class + '</div>' +
       '<div class="stat-subtitle">compared to bis</div>' +
       myScoreHtml +
       renderStatSummaryVsBis(myStats, bisStats) +
@@ -1813,7 +2121,7 @@ function renderSheet() {
       bisScoreHtml = '<div class="total-score">Gear Score: ' + computeBisScore().toLocaleString() + '</div>';
     }
     centerHtml += '<div class="character-model compact">' +
-      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + spec.icon + ' ' + spec.spec + ' ' + spec.class + '</div>' +
+      '<div class="spec-title" style="color:' + classColor + ';margin-bottom:6px;font-size:0.85rem;">' + specIconImg + spec.spec + ' ' + spec.class + '</div>' +
       (spec.notes ? '<div class="spec-notes">' + spec.notes + '</div>' : '') +
       bisScoreHtml +
       '<div style="font-size:0.65rem;color:var(--text-dim);margin-bottom:4px;opacity:0.7;">Stats include gems &amp; enchants</div>' +
@@ -2747,9 +3055,10 @@ function parseAddonExport(text) {
   var version = 0;
   if (header === 'TIERZERO:1') version = 1;
   else if (header === 'TIERZERO:2') version = 2;
+  else if (header === 'TIERZERO:3') version = 3;
   else return null;
 
-  var result = { equipped: {}, bags: [], bank: [], charName: '', version: version };
+  var result = { equipped: {}, bags: [], bank: [], charName: '', server: '', prices: {}, version: version };
   for (var i = 1; i < lines.length; i++) {
     var line = lines[i].trim();
     if (line === 'END') break;
@@ -2758,6 +3067,15 @@ function parseAddonExport(text) {
 
     if (type === 'CHAR' && parts.length >= 2) {
       result.charName = parts.slice(1).join(':');
+    } else if (type === 'SERVER' && parts.length >= 2) {
+      result.server = parts.slice(1).join(':');
+    } else if (type === 'PRICE' && parts.length >= 4) {
+      var priceItemId = parts[1];
+      var priceCopper = parseInt(parts[2], 10) || 0;
+      var priceAge = parseInt(parts[3], 10);
+      if (priceCopper > 0) {
+        result.prices[priceItemId] = { price: priceCopper, age: isNaN(priceAge) ? -1 : priceAge };
+      }
     } else if (type === 'EQ' && parts.length >= 6) {
       var slot = parts[1];
       // Find gems field by looking for comma-separated values (unique to gems field)
@@ -3111,7 +3429,7 @@ function showImportModal() {
   panel.innerHTML =
     '<h3>Paste Addon Export</h3>' +
     '<div class="import-instructions">In WoW, type <strong>/tz</strong> then <strong>Ctrl+C</strong>. Paste here.</div>' +
-    '<textarea id="import-textarea" rows="8" placeholder="TIERZERO:1\nCHAR:...\nEQ:head:12345:...\n..."></textarea>' +
+    '<textarea id="import-textarea" rows="8" placeholder="TIERZERO:3\nCHAR:...\nEQ:head:12345:...\nPRICE:24030:839990:2\n..."></textarea>' +
     '<div class="import-btn-row">' +
       '<button class="import-primary" onclick="doImport()">Import Equipped Gear</button>' +
       '<button class="import-cancel" onclick="hideImportModal()">Cancel</button>' +
@@ -3143,7 +3461,7 @@ function doImport() {
   var parsed = parseAddonExport(ta.value);
   if (!parsed) {
     msgEl.className = 'import-msg error';
-    msgEl.textContent = 'Invalid export string. Make sure it starts with TIERZERO:1 or TIERZERO:2';
+    msgEl.textContent = 'Invalid export string. Make sure it starts with TIERZERO:1, TIERZERO:2, or TIERZERO:3';
     return;
   }
 
@@ -3152,6 +3470,20 @@ function doImport() {
   msgEl.textContent = 'Imported ' + result.total + ' items. ' + result.bis + ' matched BiS list, ' + result.custom + ' added as custom.';
   if (parsed.charName) {
     msgEl.textContent += ' (Character: ' + parsed.charName + ')';
+  }
+
+  // Save AH pricing data if present (v3+)
+  var priceKeys = Object.keys(parsed.prices);
+  if (priceKeys.length > 0) {
+    var ahData = {
+      server: parsed.server || (parsed.charName ? parsed.charName.split('-')[1] || '' : ''),
+      importTime: Math.floor(Date.now() / 1000),
+      prices: parsed.prices
+    };
+    try {
+      localStorage.setItem('prebis-ah-prices', JSON.stringify(ahData));
+    } catch(e) {}
+    msgEl.textContent += ' AH prices: ' + priceKeys.length + ' gems.';
   }
 
   // Save bag/bank data for future reference
@@ -3204,6 +3536,32 @@ function findInventoryMatches(slotKey, spec, allInv, tracked) {
     }
     if (owned) matches.push({ item: item, specIndex: i });
   }
+  // Include custom tracked item (not in BiS list) so optimizer sees its stats
+  var tv = tracked[slotKey];
+  if (tv !== undefined && tv !== "" && String(tv).indexOf("c:") === 0) {
+    var custom = parseCustomItem(String(tv));
+    if (custom && custom.id) {
+      var alreadyIn = false;
+      for (var m = 0; m < matches.length; m++) {
+        if (matches[m].item.id === custom.id) { alreadyIn = true; break; }
+      }
+      if (!alreadyIn) {
+        var data = getCustomItemData(custom.id);
+        var q = Q.rare;
+        if (data && data.quality) q = QUALITY_MAP[data.quality] || Q.rare;
+        matches.push({
+          item: {
+            name: custom.name, id: custom.id, src: "Custom", q: q,
+            stats: data ? data.stats : null,
+            sockets: data ? data.sockets : null,
+            socketBonus: data ? data.socketBonus : null,
+            isCustom: true
+          },
+          specIndex: -1
+        });
+      }
+    }
+  }
   return matches;
 }
 
@@ -3235,7 +3593,7 @@ function getCapGemId(socketColor, capKey) {
   // Return best hit or def gem that fits the socket
   if (capKey === "hit") {
     // Rigid Dawnstone (yellow, +8 hit) fits yellow sockets
-    if (gemFits("yellow", socketColor)) return 24053;
+    if (gemFits("yellow", socketColor)) return 24051;
     // Veiled Noble Topaz (orange, +5sp +4hit) fits red sockets
     if (gemFits("orange", socketColor)) return 31867;
     // For blue sockets — no pure hit blue gem; use purple Glowing Nightseye (sp+stam) — no hit
@@ -3244,9 +3602,9 @@ function getCapGemId(socketColor, capKey) {
   }
   if (capKey === "def") {
     // Enduring Talasite (green, +4def +6stam) fits blue sockets
-    if (gemFits("green", socketColor)) return 24065;
-    // Thick Golden Draenite (yellow, +6def) fits yellow sockets
-    if (gemFits("yellow", socketColor)) return 23115;
+    if (gemFits("green", socketColor)) return 24062;
+    // Thick Dawnstone (yellow, +8def) fits yellow sockets
+    if (gemFits("yellow", socketColor)) return 24052;
     return 0;
   }
   return 0;
@@ -3337,16 +3695,64 @@ function buildHybridGemVariant(item, bisGems, capKey) {
   return { stats: stats, gems: gems, bonusActive: bonusActive };
 }
 
+function buildJamBestGemVariant(item, bisGems, specSlug) {
+  if (!item.sockets || item.sockets.length === 0) return null;
+  var weights = (typeof STAT_WEIGHTS !== "undefined") ? STAT_WEIGHTS[specSlug] : null;
+  if (!weights) return null;
+  // Find the single highest-scoring non-meta gem
+  var colors = ["red", "orange", "yellow", "green", "blue", "purple"];
+  var bestGemId = 0;
+  var bestGemScore = -1;
+  for (var c = 0; c < colors.length; c++) {
+    var gid = bisGems[colors[c]];
+    var g = gid ? GEMS[gid] : null;
+    if (!g || !g.stats) continue;
+    var sc = 0;
+    var ks = Object.keys(g.stats);
+    for (var j = 0; j < ks.length; j++) sc += (weights[ks[j]] || 0) * g.stats[ks[j]];
+    if (sc > bestGemScore) { bestGemScore = sc; bestGemId = gid; }
+  }
+  if (!bestGemId) return null;
+  var bestGem = GEMS[bestGemId];
+  var stats = {};
+  var gems = [];
+  for (var i = 0; i < item.sockets.length; i++) {
+    var sc = item.sockets[i];
+    if (sc === "meta") {
+      var metaId = bisGems.meta;
+      var meta = metaId ? GEMS[metaId] : null;
+      gems.push(metaId || 0);
+      if (meta && meta.stats) addStats(stats, meta.stats);
+    } else {
+      gems.push(bestGemId);
+      if (bestGem.stats) addStats(stats, bestGem.stats);
+    }
+  }
+  // No socket bonus (colors likely don't match)
+  return { stats: stats, gems: gems, bonusActive: false };
+}
+
 function generateGemVariants(item, specSlug, capKey) {
   var bisGems = getActiveBisGems(specSlug);
   if (!bisGems || !item.sockets || item.sockets.length === 0) {
     return [{ stats: {}, gems: [], bonusActive: false }];
   }
   var variants = [buildBisGemVariant(item, bisGems)];
+
+  // "Jam best gem" variant — best single gem in every non-meta socket
+  var jamVar = buildJamBestGemVariant(item, bisGems, specSlug);
+  if (jamVar) {
+    var diffJam = false;
+    for (var i = 0; i < jamVar.gems.length; i++) {
+      if (jamVar.gems[i] !== variants[0].gems[i]) { diffJam = true; break; }
+    }
+    if (diffJam) variants.push(jamVar);
+  }
+
   if (capKey) {
     var capVar = buildCapGemVariant(item, bisGems, capKey);
     if (capVar) {
-      // Check it's actually different from BiS variant
+      // Check it's actually different from existing variants
       var diff = false;
       for (var i = 0; i < capVar.gems.length; i++) {
         if (capVar.gems[i] !== variants[0].gems[i]) { diff = true; break; }
@@ -3740,7 +4146,7 @@ function optimizeGearSet(specSlug) {
         item: item,
         gems: slotGems,
         enchantId: enchId,
-        score: itemScore(item, specSlug)
+        score: fullItemScore(item, specSlug, sk)
       };
     }
   }
@@ -3779,7 +4185,7 @@ function greedyBestPerSlot(specSlug, spec, allInv, tracked) {
       // Enforce ring/trinket uniqueness
       if ((sk === "ring2" || sk === "trinket2") && usedIds[item.id]) continue;
 
-      var s = itemScore(item, specSlug);
+      var s = fullItemScore(item, specSlug, sk);
       if (s > bestScore) {
         bestScore = s;
         bestMatch = item;
@@ -3833,7 +4239,7 @@ function renderSwapSuggestion(slotKey) {
     if (hasGems && hasEnchant) html += '<span class="ge-sep">|</span>';
     if (hasEnchant) {
       var ench = findEnchantById(slotKey, swap.enchantId);
-      if (ench) html += '<span class="ge-enchant">' + ench.name + '</span>';
+      if (ench) html += '<span class="ge-enchant">' + ench.name + enchantCostSpan(swap.enchantId) + '</span>';
     }
     html += '</div>';
   }
@@ -3885,6 +4291,16 @@ function runOptimizerInline() {
       if (!isDifferent) {
         var curEnch = trackedEnchants[sk] || 0;
         if ((opt.enchantId || 0) !== (curEnch || 0)) isDifferent = true;
+      }
+    }
+
+    // For paired slots, skip if the recommended item is already equipped in the sibling
+    if (isDifferent) {
+      var pairedSlots = { ring1:"ring2", ring2:"ring1", trinket1:"trinket2", trinket2:"trinket1" };
+      var sibling = pairedSlots[sk];
+      if (sibling) {
+        var sibItem = getTrackedItem(sibling);
+        if (sibItem && sibItem.id === opt.item.id) isDifferent = false;
       }
     }
 
@@ -4119,12 +4535,13 @@ function renderRaidSetup() {
         if (recGemId && curGemId !== recGemId) {
           var gem = GEMS[recGemId];
           if (gem) {
-            gemSuggestions.push({ slot: sk, socketIdx: s, gem: gem, socketColor: socketColor });
+            gemSuggestions.push({ slot: sk, socketIdx: s, gem: gem, recGemId: recGemId, socketColor: socketColor });
           }
         }
       }
     }
     if (gemSuggestions.length > 0 && gemSuggestions.length <= 30) {
+      var raidAhPrices = loadAhPrices();
       html += '<div class="raid-section">';
       html += '<div class="raid-section-title">Gem Suggestions (' + gemSuggestions.length + ')</div>';
       html += '<div class="raid-gem-list">';
@@ -4134,6 +4551,14 @@ function renderRaidSetup() {
         html += '<div class="raid-gem-item">';
         html += '<span class="gem-socket ' + gs.gem.color + ' filled" style="width:12px;height:12px;"></span> ';
         html += '<span style="color:var(--text-gold);">' + gs.gem.name + '</span>';
+        if (raidAhPrices) {
+          var gemPriceInfo = getGemAhPrice(gs.recGemId, raidAhPrices);
+          if (gemPriceInfo) {
+            html += ' <span class="ah-price ah-available">' + formatGoldPrice(gemPriceInfo.price) + '</span>';
+          } else {
+            html += ' <span class="ah-price ah-unavailable">not on AH</span>';
+          }
+        }
         html += ' <span style="font-size:0.68rem;color:var(--text-dim);">— ' + label + '</span>';
         html += '</div>';
       }

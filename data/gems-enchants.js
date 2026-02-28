@@ -4,62 +4,103 @@ var STAT_NAMES = {sp:"Spell Power",hit:"Hit Rating",crit:"Crit Rating",int:"Inte
 // Gems Database
 // ---------------------------------------------------------------------------
 var GEMS = {
-  // Meta
+  // ===== META GEMS =====
   34220:{name:"Chaotic Skyfire Diamond",color:"meta",stats:{crit:12},effect:"+3% crit damage"},
-  25893:{name:"Insightful Earthstorm Diamond",color:"meta",stats:{int:12},effect:"Chance to restore mana"},
-  25901:{name:"Brutal Earthstorm Diamond",color:"meta",stats:{ap:12},effect:"+3 melee damage"},
-  32410:{name:"Thundering Skyfire Diamond",color:"meta",stats:{},effect:"+40 haste proc on hit"},
-  // Rare Red
+  25901:{name:"Insightful Earthstorm Diamond",color:"meta",stats:{int:12},effect:"Chance to restore mana on spellcast"},
+  25899:{name:"Brutal Earthstorm Diamond",color:"meta",stats:{},effect:"+3 melee damage, chance to stun"},
+  32410:{name:"Thundering Skyfire Diamond",color:"meta",stats:{},effect:"+240 haste proc on melee/ranged hit"},
+  25890:{name:"Destructive Skyfire Diamond",color:"meta",stats:{crit:14},effect:"1% spell reflect"},
+  25893:{name:"Mystical Skyfire Diamond",color:"meta",stats:{},effect:"Chance to increase spell cast speed"},
+  25894:{name:"Swift Skyfire Diamond",color:"meta",stats:{ap:24},effect:"Minor run speed increase"},
+  25895:{name:"Enigmatic Skyfire Diamond",color:"meta",stats:{crit:12},effect:"5% snare/root resist"},
+  25896:{name:"Powerful Earthstorm Diamond",color:"meta",stats:{stam:18},effect:"5% stun resist"},
+  25897:{name:"Bracing Earthstorm Diamond",color:"meta",stats:{heal:26,sp:9},effect:"2% reduced threat"},
+  25898:{name:"Tenacious Earthstorm Diamond",color:"meta",stats:{def:12},effect:"Chance to restore health on hit"},
+  32409:{name:"Relentless Earthstorm Diamond",color:"meta",stats:{agi:12},effect:"+3% crit damage"},
+  35501:{name:"Eternal Earthstorm Diamond",color:"meta",stats:{def:12},effect:"+10% shield block value"},
+  35503:{name:"Ember Skyfire Diamond",color:"meta",stats:{sp:14},effect:"+2% intellect"},
+  // ===== RARE RED (Living Ruby) =====
   24030:{name:"Runed Living Ruby",color:"red",stats:{sp:9}},
   24027:{name:"Bold Living Ruby",color:"red",stats:{str:8}},
   24028:{name:"Delicate Living Ruby",color:"red",stats:{agi:8}},
-  24036:{name:"Teardrop Living Ruby",color:"red",stats:{heal:18}},
-  // Uncommon Red (Blood Garnet)
+  24029:{name:"Teardrop Living Ruby",color:"red",stats:{heal:18}},
+  24031:{name:"Bright Living Ruby",color:"red",stats:{ap:16}},
+  24032:{name:"Subtle Living Ruby",color:"red",stats:{dodge:8}},
+  24036:{name:"Flashing Living Ruby",color:"red",stats:{parry:8}},
+  // ===== UNCOMMON RED (Blood Garnet) =====
   23096:{name:"Runed Blood Garnet",color:"red",stats:{sp:7}},
   23095:{name:"Bold Blood Garnet",color:"red",stats:{str:6}},
   23097:{name:"Delicate Blood Garnet",color:"red",stats:{agi:6}},
   23094:{name:"Teardrop Blood Garnet",color:"red",stats:{heal:13}},
-  // Rare Orange
+  28595:{name:"Bright Blood Garnet",color:"red",stats:{ap:12}},
+  // ===== RARE ORANGE (Noble Topaz) =====
   24059:{name:"Potent Noble Topaz",color:"orange",stats:{sp:5,crit:4}},
-  24058:{name:"Reckless Noble Topaz",color:"orange",stats:{sp:5,haste:4}},
-  24061:{name:"Inscribed Noble Topaz",color:"orange",stats:{str:4,crit:4}},
+  24058:{name:"Inscribed Noble Topaz",color:"orange",stats:{str:4,crit:4}},
+  24061:{name:"Glinting Noble Topaz",color:"orange",stats:{agi:4,hit:4}},
+  24060:{name:"Luminous Noble Topaz",color:"orange",stats:{heal:9,sp:3,int:4}},
   31867:{name:"Veiled Noble Topaz",color:"orange",stats:{sp:5,hit:4}},
   31868:{name:"Wicked Noble Topaz",color:"orange",stats:{ap:8,crit:4}},
-  // Uncommon Orange (Flame Spessarite)
+  35316:{name:"Reckless Noble Topaz",color:"orange",stats:{sp:5,haste:4}},
+  // ===== UNCOMMON ORANGE (Flame Spessarite) =====
   23101:{name:"Potent Flame Spessarite",color:"orange",stats:{sp:4,crit:3}},
   23098:{name:"Inscribed Flame Spessarite",color:"orange",stats:{str:3,crit:3}},
-  // Rare Yellow
+  23100:{name:"Glinting Flame Spessarite",color:"orange",stats:{agi:3,hit:3}},
+  23099:{name:"Luminous Flame Spessarite",color:"orange",stats:{heal:7,sp:3,int:3}},
+  31866:{name:"Veiled Flame Spessarite",color:"orange",stats:{sp:4,hit:3}},
+  31869:{name:"Wicked Flame Spessarite",color:"orange",stats:{ap:6,crit:3}},
+  // ===== RARE YELLOW (Dawnstone) =====
   24048:{name:"Smooth Dawnstone",color:"yellow",stats:{crit:8}},
-  24053:{name:"Rigid Dawnstone",color:"yellow",stats:{hit:8}},
+  24051:{name:"Rigid Dawnstone",color:"yellow",stats:{hit:8}},
   31861:{name:"Great Dawnstone",color:"yellow",stats:{hit:8}},
   24047:{name:"Brilliant Dawnstone",color:"yellow",stats:{int:8}},
-  // Uncommon Yellow (Golden Draenite)
+  24050:{name:"Gleaming Dawnstone",color:"yellow",stats:{crit:8}},
+  24052:{name:"Thick Dawnstone",color:"yellow",stats:{def:8}},
+  24053:{name:"Mystic Dawnstone",color:"yellow",stats:{res:8}},
+  35315:{name:"Quick Dawnstone",color:"yellow",stats:{haste:8}},
+  // ===== UNCOMMON YELLOW (Golden Draenite) =====
   23114:{name:"Gleaming Golden Draenite",color:"yellow",stats:{crit:6}},
   23113:{name:"Brilliant Golden Draenite",color:"yellow",stats:{int:6}},
   23115:{name:"Thick Golden Draenite",color:"yellow",stats:{def:6}},
-  // Rare Purple
+  23116:{name:"Rigid Golden Draenite",color:"yellow",stats:{hit:6}},
+  28290:{name:"Smooth Golden Draenite",color:"yellow",stats:{crit:6}},
+  31860:{name:"Great Golden Draenite",color:"yellow",stats:{hit:6}},
+  // ===== RARE BLUE (Star of Elune) =====
+  24033:{name:"Solid Star of Elune",color:"blue",stats:{stam:12}},
+  24037:{name:"Lustrous Star of Elune",color:"blue",stats:{mp5:3}},
+  24035:{name:"Sparkling Star of Elune",color:"blue",stats:{spi:8}},
+  24039:{name:"Stormy Star of Elune",color:"blue",stats:{}},
+  // ===== UNCOMMON BLUE (Azure Moonstone) =====
+  23118:{name:"Solid Azure Moonstone",color:"blue",stats:{stam:9}},
+  23121:{name:"Lustrous Azure Moonstone",color:"blue",stats:{mp5:2}},
+  23119:{name:"Sparkling Azure Moonstone",color:"blue",stats:{spi:6}},
+  23120:{name:"Stormy Azure Moonstone",color:"blue",stats:{}},
+  // ===== RARE PURPLE (Nightseye) =====
   24056:{name:"Glowing Nightseye",color:"purple",stats:{sp:5,stam:6}},
   24054:{name:"Sovereign Nightseye",color:"purple",stats:{str:4,stam:6}},
   24055:{name:"Shifting Nightseye",color:"purple",stats:{agi:4,stam:6}},
-  31116:{name:"Infused Nightseye",color:"purple",stats:{sp:5,int:4}},
-  // Uncommon Purple (Shadow Draenite)
+  24057:{name:"Royal Nightseye",color:"purple",stats:{heal:9,sp:3,mp5:2}},
+  31863:{name:"Balanced Nightseye",color:"purple",stats:{ap:8,stam:6}},
+  31865:{name:"Infused Nightseye",color:"purple",stats:{ap:8,mp5:2}},
+  35707:{name:"Regal Nightseye",color:"purple",stats:{dodge:4,stam:6}},
+  // ===== UNCOMMON PURPLE (Shadow Draenite) =====
   23108:{name:"Glowing Shadow Draenite",color:"purple",stats:{sp:4,stam:4}},
-  23109:{name:"Sovereign Shadow Draenite",color:"purple",stats:{str:3,stam:4}},
+  23111:{name:"Sovereign Shadow Draenite",color:"purple",stats:{str:3,stam:4}},
   23110:{name:"Shifting Shadow Draenite",color:"purple",stats:{agi:3,stam:4}},
-  // Rare Blue
-  24033:{name:"Solid Star of Elune",color:"blue",stats:{stam:12}},
-  24039:{name:"Lustrous Star of Elune",color:"blue",stats:{mp5:4}},
-  // Uncommon Blue (Azure Moonstone)
-  23118:{name:"Solid Azure Moonstone",color:"blue",stats:{stam:9}},
-  23119:{name:"Lustrous Azure Moonstone",color:"blue",stats:{mp5:3}},
-  // Rare Green
-  24066:{name:"Dazzling Talasite",color:"green",stats:{int:4,mp5:2}},
-  24065:{name:"Enduring Talasite",color:"green",stats:{def:4,stam:6}},
-  30608:{name:"Forceful Talasite",color:"green",stats:{haste:4,stam:6}},
+  23109:{name:"Royal Shadow Draenite",color:"purple",stats:{heal:7,sp:3,mp5:1}},
+  31862:{name:"Balanced Shadow Draenite",color:"purple",stats:{ap:6,stam:4}},
+  31864:{name:"Infused Shadow Draenite",color:"purple",stats:{ap:6,mp5:1}},
+  // ===== RARE GREEN (Talasite) =====
+  24065:{name:"Dazzling Talasite",color:"green",stats:{int:4,mp5:2}},
+  24062:{name:"Enduring Talasite",color:"green",stats:{def:4,stam:6}},
+  35318:{name:"Forceful Talasite",color:"green",stats:{haste:4,stam:6}},
   33782:{name:"Steady Talasite",color:"green",stats:{res:4,stam:6}},
-  // Uncommon Green (Deep Peridot)
+  24066:{name:"Radiant Talasite",color:"green",stats:{crit:4}},
+  24067:{name:"Jagged Talasite",color:"green",stats:{crit:4,stam:6}},
+  // ===== UNCOMMON GREEN (Deep Peridot) =====
   23104:{name:"Jagged Deep Peridot",color:"green",stats:{crit:3,stam:4}},
-  23105:{name:"Enduring Deep Peridot",color:"green",stats:{def:3,stam:4}}
+  23105:{name:"Enduring Deep Peridot",color:"green",stats:{def:3,stam:4}},
+  23106:{name:"Dazzling Deep Peridot",color:"green",stats:{int:3,mp5:1}},
+  23103:{name:"Radiant Deep Peridot",color:"green",stats:{crit:3}}
 };
 
 var GEM_FITS = {
@@ -223,29 +264,29 @@ var BIS_GEMS = {
   "arcane-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
   "frost-mage":{meta:34220,red:24030,yellow:31867,blue:24056},
   "shadow-priest":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "holy-priest":{meta:25893,red:24036,yellow:24066,blue:24039},
-  "discipline-priest":{meta:25893,red:24036,yellow:24066,blue:24039},
+  "holy-priest":{meta:25901,red:24029,yellow:24065,blue:24037},
+  "discipline-priest":{meta:25901,red:24029,yellow:24065,blue:24037},
   "affliction-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
   "destruction-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
   "demonology-warlock":{meta:34220,red:24030,yellow:31867,blue:24056},
   "elemental-shaman":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "enhancement-shaman":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "resto-shaman":{meta:25893,red:24036,yellow:24066,blue:24039},
+  "enhancement-shaman":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "resto-shaman":{meta:25901,red:24029,yellow:24065,blue:24037},
   "balance-druid":{meta:34220,red:24030,yellow:31867,blue:24056},
-  "resto-druid":{meta:25893,red:24036,yellow:24066,blue:24039},
-  "feral-cat-druid":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "feral-bear-druid":{meta:25901,red:24028,yellow:24065,blue:24033},
-  "fury-warrior":{meta:25901,red:24027,yellow:31868,blue:24054},
-  "arms-warrior":{meta:25901,red:24027,yellow:31868,blue:24054},
-  "prot-warrior":{meta:25901,red:24028,yellow:24065,blue:24033},
-  "ret-paladin":{meta:25901,red:24027,yellow:31868,blue:24054},
-  "prot-paladin":{meta:25893,red:24028,yellow:24065,blue:24033},
-  "holy-paladin":{meta:25893,red:24036,yellow:24066,blue:24039},
-  "combat-rogue":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "assassination-rogue":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "bm-hunter":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "mm-hunter":{meta:25901,red:24028,yellow:31868,blue:24055},
-  "survival-hunter":{meta:25901,red:24028,yellow:31868,blue:24055}
+  "resto-druid":{meta:25901,red:24029,yellow:24065,blue:24037},
+  "feral-cat-druid":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "feral-bear-druid":{meta:25896,red:24028,yellow:24062,blue:24033},
+  "fury-warrior":{meta:32409,red:24027,yellow:31868,blue:24054},
+  "arms-warrior":{meta:32409,red:24027,yellow:31868,blue:24054},
+  "prot-warrior":{meta:25896,red:24028,yellow:24062,blue:24033},
+  "ret-paladin":{meta:32409,red:24027,yellow:31868,blue:24054},
+  "prot-paladin":{meta:25901,red:24028,yellow:24062,blue:24033},
+  "holy-paladin":{meta:25901,red:24029,yellow:24065,blue:24037},
+  "combat-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "assassination-rogue":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "bm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "mm-hunter":{meta:32409,red:24028,yellow:31868,blue:24055},
+  "survival-hunter":{meta:32409,red:24028,yellow:31868,blue:24055}
 };
 
 // ---------------------------------------------------------------------------
@@ -289,22 +330,22 @@ var BUDGET_GEM_MAP = {
   24030: 23096,  // Runed: sp:9 → sp:7
   24027: 23095,  // Bold: str:8 → str:6
   24028: 23097,  // Delicate: agi:8 → agi:6
-  24036: 23094,  // Teardrop: heal:18 → heal:13
+  24029: 23094,  // Teardrop: heal:18 → heal:13
   // Orange: Noble Topaz → Flame Spessarite
   24059: 23101,  // Potent: sp:5,crit:4 → sp:4,crit:3
-  24061: 23098,  // Inscribed: str:4,crit:4 → str:3,crit:3
+  24058: 23098,  // Inscribed: str:4,crit:4 → str:3,crit:3
   // Yellow: Dawnstone → Golden Draenite
   24048: 23114,  // Smooth: crit:8 → crit:6
   24047: 23113,  // Brilliant: int:8 → int:6
   // Blue: Star of Elune → Azure Moonstone
   24033: 23118,  // Solid: stam:12 → stam:9
-  24039: 23119,  // Lustrous: mp5:4 → mp5:3
+  24037: 23121,  // Lustrous: mp5:3 → mp5:2
   // Purple: Nightseye → Shadow Draenite
   24056: 23108,  // Glowing: sp:5,stam:6 → sp:4,stam:4
-  24054: 23109,  // Sovereign: str:4,stam:6 → str:3,stam:4
+  24054: 23111,  // Sovereign: str:4,stam:6 → str:3,stam:4
   24055: 23110,  // Shifting: agi:4,stam:6 → agi:3,stam:4
   // Green: Talasite → Deep Peridot
-  24065: 23105   // Enduring: def:4,stam:6 → def:3,stam:4
+  24062: 23105   // Enduring: def:4,stam:6 → def:3,stam:4
 };
 
 var BUDGET_ENCHANT_MAP = {
@@ -317,8 +358,85 @@ var BUDGET_ENCHANT_MAP = {
   23547: 28903,  // Greater Insc. of the Orb → Insc. of the Orb
   // Legs: Exalted → budget
   31372: 31373,  // Runic Spellthread → Mystic Spellthread
+  // Feet: run-speed enchants → raw stat enchants
+  34007: 27951,  // Cat's Swiftness (agi:6 + speed) → Dexterity (agi:12)
+  34008: 27954,  // Boar's Speed (stam:9 + speed) → Vitality (+4 hp/mp5)
+  // Weapon: expensive → cheaper
+  27984: 46538,  // Mongoose (proc) → Greater Agility (agi:20)
   // Rings: skip entirely (require 360 Enchanting)
   27927: null,   // Spellpower → skip
   27926: null,   // Healing Power → skip
   27924: null    // Stats → skip
+};
+
+// ---------------------------------------------------------------------------
+// Enchant Cost Data — vendor gold, tradeable items, or crafting materials
+// Material IDs: 22445=Arcane Dust, 22446=Greater Planar Essence,
+//   22447=Lesser Planar Essence, 22448=Small Prismatic Shard,
+//   22449=Large Prismatic Shard, 22450=Void Crystal,
+//   22451=Primal Air, 22452=Primal Earth, 22456=Primal Shadow,
+//   22457=Primal Mana, 21884=Primal Fire, 21885=Primal Water
+// Verified against Wowhead spell tooltips (Feb 2026)
+// ---------------------------------------------------------------------------
+var ENCHANT_COSTS = {
+  // --- VENDOR: Head Glyphs (rep vendors, fixed gold) ---
+  29191: {type:"vendor",gold:100},  // Glyph of Power
+  29192: {type:"vendor",gold:100},  // Glyph of Ferocity
+  29186: {type:"vendor",gold:100},  // Glyph of the Defender
+  29189: {type:"vendor",gold:100},  // Glyph of Renewal
+
+  // --- VENDOR: Shoulder Inscriptions ---
+  28886: {type:"vendor",gold:100},  // Greater Insc. of Discipline (Aldor Exalted)
+  28909: {type:"vendor",gold:100},  // Greater Insc. of the Oracle
+  28888: {type:"vendor",gold:100},  // Greater Insc. of the Blade
+  28889: {type:"vendor",gold:100},  // Greater Insc. of the Knight
+  23545: {type:"vendor",gold:100},  // Greater Insc. of Vengeance (Scryer Exalted)
+  23547: {type:"vendor",gold:100},  // Greater Insc. of the Orb
+  28881: {type:"vendor",gold:20},   // Insc. of Discipline (Honored)
+  28885: {type:"vendor",gold:20},   // Insc. of Vengeance (Honored)
+  28882: {type:"vendor",gold:20},   // Insc. of Warding (Honored)
+  28903: {type:"vendor",gold:20},   // Insc. of the Orb (Honored)
+  28907: {type:"vendor",gold:20},   // Insc. of the Blade (Honored)
+  28904: {type:"vendor",gold:20},   // Insc. of the Oracle (Honored)
+
+  // --- ITEM: Leg Armors/Spellthreads (tradeable on AH) ---
+  31372: {type:"item",itemId:24274}, // Runic Spellthread
+  31373: {type:"item",itemId:24273}, // Mystic Spellthread
+  29535: {type:"item",itemId:29535}, // Nethercobra Leg Armor
+  29536: {type:"item",itemId:29536}, // Nethercleft Leg Armor
+
+  // --- MATS: Enchanting recipes ---
+  // Back
+  25084: {type:"mats",mats:[[22448,4],[22446,2],[22456,8]]},     // Subtlety
+  34004: {type:"mats",mats:[[22446,2],[22445,6],[22457,2]]},     // Spell Penetration
+  34003: {type:"mats",mats:[[22446,1],[22445,4],[22451,1]]},     // Greater Agility
+  // Chest
+  27960: {type:"mats",mats:[[22449,4],[22446,4],[22445,4]]},     // Exceptional Stats
+  33990: {type:"mats",mats:[[22446,2]]},                         // Major Spirit
+  46594: {type:"mats",mats:[[22446,4],[22445,8]]},               // Defense
+  // Wrists
+  27917: {type:"mats",mats:[[22449,6],[21884,6],[21885,6]]},     // Spellpower
+  34001: {type:"mats",mats:[[22447,3]]},                         // Major Intellect
+  27914: {type:"mats",mats:[[22449,1],[22446,10],[22445,20]]},   // Fortitude
+  34002: {type:"mats",mats:[[22445,6]]},                         // Assault
+  // Hands
+  33997: {type:"mats",mats:[[22446,6],[22449,6],[22457,6]]},     // Major Spellpower
+  33995: {type:"mats",mats:[[22445,12],[22446,1]]},              // Major Strength
+  25080: {type:"mats",mats:[[22448,3],[22446,3],[22451,2]]},     // Superior Agility
+  33996: {type:"mats",mats:[[22445,8]]},                         // Assault (hands)
+  // Feet
+  34007: {type:"mats",mats:[[22449,8],[22451,8]]},               // Cat's Swiftness
+  34008: {type:"mats",mats:[[22449,8],[22452,8]]},               // Boar's Speed
+  27951: {type:"mats",mats:[[22446,8],[22445,8]]},               // Dexterity
+  // Mainhand weapon
+  27975: {type:"mats",mats:[[22449,8],[22446,8]]},               // Major Spellpower
+  27984: {type:"mats",mats:[[22450,6],[22449,10],[22446,8],[22445,40]]}, // Mongoose
+  46538: {type:"mats",mats:[[22445,8],[22446,4],[22449,6],[22451,2]]},   // Greater Agility (1H)
+  27967: {type:"mats",mats:[[22449,2],[22446,6],[22445,6]]},     // Major Striking
+  // Twohand weapon
+  27977: {type:"mats",mats:[[22449,8],[22446,6],[22445,20]]},    // Major Agility (2H)
+  // Rings (require 360+ Enchanting)
+  27927: {type:"mats",mats:[[22449,2],[22446,2]]},               // Spellpower (ring)
+  27926: {type:"mats",mats:[[22449,2],[22446,3],[22445,5]]},     // Healing Power (ring)
+  27924: {type:"mats",mats:[[22450,2],[22449,2]]}                // Stats (ring)
 };
